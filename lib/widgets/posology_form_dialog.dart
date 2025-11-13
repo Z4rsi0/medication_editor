@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/medication_provider.dart';
-import '../models/medication.dart'; // Assurez-vous que Posology, Tranche sont ici
-import '../utils/constants.dart'; // L'importation correcte vers votre fichier constants.dart
+import '../models/medication.dart';
+import '../utils/constants.dart';
 
 // ====================================================================
 // WIDGET PRINCIPAL
@@ -29,8 +29,9 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
   final _formKey = GlobalKey<FormState>();
 
   // Controllers
+  final _voieController = TextEditingController();
   final _preparationController = TextEditingController();
-  final _dosesController = TextEditingController(); // pour schémas complexes (global)
+  final _dosesController = TextEditingController();
 
   // Dose simple
   final _doseKgController = TextEditingController();
@@ -39,11 +40,10 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
   final _doseMaxController = TextEditingController();
 
   // Variables
-  String? _selectedVoie;
   String? _selectedUnite;
-  bool _useDoseRange = false; // dose fixe vs intervalle
-  bool _useTranches = false; // tranches de poids/âge
-  bool _useComplexScheme = false; // schéma texte (global)
+  bool _useDoseRange = false;
+  bool _useTranches = false;
+  bool _useComplexScheme = false;
 
   // Tranches
   List<TrancheData> _tranches = [];
@@ -57,7 +57,7 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
         : null;
 
     if (posology != null) {
-      _selectedVoie = posology.voie;
+      _voieController.text = posology.voie;
       _selectedUnite = posology.unite;
       _preparationController.text = posology.preparation ?? '';
       _doseMaxController.text = posology.doseMax?.toString() ?? '';
@@ -82,6 +82,7 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
 
   @override
   void dispose() {
+    _voieController.dispose();
     _preparationController.dispose();
     _dosesController.dispose();
     _doseKgController.dispose();
@@ -110,7 +111,7 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
         return;
       }
 
-      // Validation pour les tranches : s'assurer qu'au moins un champ de dose est rempli
+      // Validation pour les tranches
       if (_useTranches) {
         bool allTranchesHaveDose = _tranches.every((tranche) {
           if (tranche.useComplexScheme) {
@@ -133,24 +134,19 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
         }
       }
 
-      // Déterminer si un schéma complexe ou des tranches sont utilisés
       final bool isComplexOrTranchesUsed = _useComplexScheme || _useTranches;
 
       final posology = Posology(
-        voie: _selectedVoie!,
+        voie: _voieController.text.trim(),
         unite: _selectedUnite!,
         preparation: _preparationController.text.trim().isEmpty
             ? null
             : _preparationController.text.trim(),
         doseMax: _parseNumber(_doseMaxController.text),
-
-        // Logique de dosage : priorité à doses (complexe global) ou tranches
         doses: _useComplexScheme ? _dosesController.text.trim() : null,
         tranches: _useTranches
             ? _tranches.map((td) => td.toTranche()).toList()
             : null,
-
-        // Les champs de dose simple DOIVENT être null si un schéma complexe ou des tranches sont utilisés.
         doseKg: !isComplexOrTranchesUsed && !_useDoseRange
             ? _parseNumber(_doseKgController.text)
             : null,
@@ -175,7 +171,6 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // CORRECTION CRITIQUE : Retourner un AlertDialog pour fournir le contexte Material
     return AlertDialog(
       scrollable: true,
       title: Text(widget.index == null
@@ -187,27 +182,60 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Voie d'administration
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Voie d\'administration',
-                border: OutlineInputBorder(),
-              ),
-              value: _selectedVoie,
-              // Utilisation de MedicationConstants.voies
-              items: MedicationConstants.voies.map((voie) {
-                return DropdownMenuItem(
-                  value: voie,
-                  child: Text(voie),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedVoie = value;
+            // Voie d'administration avec Autocomplete
+            Autocomplete<String>(
+              initialValue: TextEditingValue(text: _voieController.text),
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return const Iterable<String>.empty();
+                }
+                return MedicationConstants.voies.where((String option) {
+                  return option
+                      .toLowerCase()
+                      .contains(textEditingValue.text.toLowerCase());
                 });
               },
-              validator: (value) =>
-                  value == null ? 'Sélectionnez une voie' : null,
+              onSelected: (String selection) {
+                _voieController.text = selection;
+              },
+              fieldViewBuilder: (BuildContext context,
+                  TextEditingController fieldTextEditingController,
+                  FocusNode fieldFocusNode,
+                  VoidCallback onFieldSubmitted) {
+                // Synchroniser avec notre controller
+                if (fieldTextEditingController.text != _voieController.text) {
+                  fieldTextEditingController.text = _voieController.text;
+                }
+                
+                // Écouter les changements
+                fieldTextEditingController.addListener(() {
+                  _voieController.text = fieldTextEditingController.text;
+                });
+
+                return TextFormField(
+                  controller: fieldTextEditingController,
+                  focusNode: fieldFocusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Voie d\'administration',
+                    hintText: 'Ex: IV, PO, IM...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.medical_services),
+                    helperText: 'Tapez pour voir les suggestions',
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'La voie est obligatoire';
+                    }
+                    return null;
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Suggestions disponibles ou saisissez votre propre voie',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
             const SizedBox(height: 16),
 
@@ -218,7 +246,6 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
                 border: OutlineInputBorder(),
               ),
               value: _selectedUnite,
-              // Utilisation de MedicationConstants.unites
               items: MedicationConstants.unites.map((unite) {
                 return DropdownMenuItem(
                   value: unite,
@@ -256,7 +283,6 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
               onChanged: (bool value) {
                 setState(() {
                   _useComplexScheme = value;
-                  // Reset des autres options si le schéma complexe est activé
                   if (value) {
                     _useTranches = false;
                     _useDoseRange = false;
@@ -295,18 +321,15 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
                 onChanged: (bool value) {
                   setState(() {
                     _useTranches = value;
-                    // Reset des champs dose si tranches activées
                     if (value) {
                       _doseKgController.clear();
                       _doseKgMinController.clear();
                       _doseKgMaxController.clear();
                       _useDoseRange = false;
                       if (_tranches.isEmpty) {
-                        // Assurer au moins une tranche lors de l'activation
                         _tranches.add(TrancheData());
                       }
                     } else {
-                      // Si désactivé, vider les tranches pour éviter des erreurs
                       _tranches.clear();
                     }
                   });
@@ -456,7 +479,9 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
         ),
         ElevatedButton(
           onPressed:
-              _selectedVoie == null || _selectedUnite == null ? null : _savePosology,
+              _voieController.text.trim().isEmpty || _selectedUnite == null 
+                  ? null 
+                  : _savePosology,
           child: Text(widget.index == null ? 'Ajouter' : 'Enregistrer'),
         ),
       ],
@@ -479,11 +504,10 @@ class TrancheData {
   final TextEditingController dosesController = TextEditingController();
 
   bool useDoseRange = false;
-  bool useComplexScheme = false; // Permet le schéma texte libre DANS la tranche
+  bool useComplexScheme = false;
 
   TrancheData();
 
-  // Constructeur pour charger les données d'une Tranche existante
   static TrancheData fromTranche(Tranche tranche) {
     final data = TrancheData();
     if (tranche.poidsMin != null) {
@@ -518,7 +542,6 @@ class TrancheData {
   }
 
   Tranche toTranche() {
-    // Si useComplexScheme est vrai, les autres champs de dose sont nullifiés.
     final bool useComplex = useComplexScheme;
     
     return Tranche(
@@ -526,9 +549,7 @@ class TrancheData {
       poidsMax: _parseNumber(poidsMaxController.text),
       ageMin: _parseNumber(ageMinController.text),
       ageMax: _parseNumber(ageMaxController.text),
-
       doses: useComplex ? dosesController.text.trim() : null,
-
       doseKg: !useComplex && !useDoseRange
           ? _parseNumber(doseKgController.text)
           : null,
@@ -662,7 +683,7 @@ class _TrancheFormState extends State<TrancheForm> {
             ),
             const SizedBox(height: 16),
 
-            // NOUVEAU: Switch : Schéma complexe (texte libre) pour la tranche
+            // Switch : Schéma complexe (texte libre) pour la tranche
             SwitchListTile(
               title:
                   const Text('Schéma complexe (texte libre) pour cette tranche'),
@@ -672,7 +693,6 @@ class _TrancheFormState extends State<TrancheForm> {
               onChanged: (bool value) {
                 setState(() {
                   widget.tranche.useComplexScheme = value;
-                  // Vider les autres champs de dose si schéma complexe activé
                   if (value) {
                     widget.tranche.useDoseRange = false;
                     widget.tranche.doseKgController.clear();
@@ -686,7 +706,7 @@ class _TrancheFormState extends State<TrancheForm> {
             ),
             const SizedBox(height: 8),
 
-            // NOUVEAU: Affichage du champ "doses" si schéma complexe
+            // Affichage du champ "doses" si schéma complexe
             if (widget.tranche.useComplexScheme)
               TextFormField(
                 controller: widget.tranche.dosesController,
@@ -702,7 +722,7 @@ class _TrancheFormState extends State<TrancheForm> {
                         ? 'Saisissez la posologie complexe'
                         : null,
               )
-            else // Bloc pour Dose Simple ou Intervalle (SI PAS de Schéma Complexe)
+            else
               Column(
                 children: [
                   // Dose simple vs Intervalle de dose

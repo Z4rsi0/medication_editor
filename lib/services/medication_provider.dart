@@ -1,13 +1,16 @@
+// ignore_for_file: avoid_print
+
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/medication.dart';
-import 'package:http/http.dart' as http;
+import 'github_service.dart';
 
 class MedicationProvider extends ChangeNotifier {
   final List<Medication> _medications = [];
   Medication? _currentMedication;
   Indication? _currentIndication;
   int? _editingIndex;
+  final GitHubService _gitHub = GitHubService();
 
   List<Medication> get medications => _medications;
   Medication? get currentMedication => _currentMedication;
@@ -192,20 +195,33 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
-  // Charger les médicaments depuis GitHub
+  // Charger les médicaments depuis GitHub via GitHubService
   Future<void> loadFromGitHub() async {
-    const url = 'https://raw.githubusercontent.com/Z4rsi0/ped_app_data/main/assets/medicaments_pediatrie.json';
-    
     try {
-      final response = await http.get(Uri.parse(url));
+      final jsonContent = await _gitHub.fetchMedications();
       
-      if (response.statusCode == 200) {
-        loadFromJson(response.body);
+      if (jsonContent != null) {
+        loadFromJson(jsonContent);
       } else {
-        throw Exception('Erreur HTTP: ${response.statusCode}');
+        throw Exception('Impossible de récupérer les données depuis GitHub');
       }
     } catch (e) {
       throw Exception('Erreur lors du chargement depuis GitHub: $e');
+    }
+  }
+
+  // Publier les médicaments sur GitHub via GitHubService
+  Future<bool> publishToGitHub(String commitMessage) async {
+    try {
+      final jsonContent = exportToJsonSorted();
+      final success = await _gitHub.publishMedications(
+        jsonContent: jsonContent,
+        commitMessage: commitMessage,
+      );
+      return success;
+    } catch (e) {
+      print('Erreur lors de la publication sur GitHub: $e');
+      return false;
     }
   }
 }

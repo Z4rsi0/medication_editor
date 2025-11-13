@@ -1,9 +1,21 @@
+// ignore_for_file: prefer_single_quotes, avoid_redundant_argument_values
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/medication_provider.dart';
+import 'services/github_service.dart';
 import 'screens/home_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Charger le fichier .env
+  await dotenv.load(fileName: ".env");
+  
+  // Initialiser le service GitHub
+  await GitHubService().initialize();
+  
   runApp(const MyApp());
 }
 
