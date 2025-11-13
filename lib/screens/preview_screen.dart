@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_to_list_in_spreads
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +7,30 @@ import '../services/medication_provider.dart';
 
 class PreviewScreen extends StatelessWidget {
   const PreviewScreen({super.key});
+
+  // Vérifie si l'unité contient déjà /kg
+  bool _unitContainsPerKg(String? unite) {
+    if (unite == null) return false;
+    return unite.contains('/kg');
+  }
+
+  // Formate l'affichage de la dose
+  String _formatDoseDisplay(dynamic dose, String? unite, bool perKg) {
+    if (unite == null) return '$dose';
+    if (_unitContainsPerKg(unite) || !perKg) {
+      return '$dose $unite';
+    }
+    return '$dose $unite/kg';
+  }
+
+  // Formate l'affichage de l'unité
+  String _formatUnitDisplay(String? unite, bool perKg) {
+    if (unite == null) return '';
+    if (_unitContainsPerKg(unite) || !perKg) {
+      return unite;
+    }
+    return '$unite/kg';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +120,6 @@ class PreviewScreen extends StatelessWidget {
                               label: Text(medication.galenique),
                               backgroundColor: Colors.teal.shade50,
                             ),
-                            // REMARQUES: Retiré (champ non existant)
                           ],
                         ),
                       ),
@@ -129,7 +154,6 @@ class PreviewScreen extends StatelessWidget {
                                   contentPadding: EdgeInsets.zero,
                                   leading: const Icon(Icons.colorize,
                                       color: Colors.teal),
-                                  // FREQUENCY: Retiré (champ non existant)
                                   title: Text('Voie: ${pos.voie}'),
                                   subtitle: Column(
                                     crossAxisAlignment:
@@ -142,15 +166,13 @@ class PreviewScreen extends StatelessWidget {
                                       else if (pos.doses != null)
                                         Text('Schéma: ${pos.doses}')
                                       else if (pos.doseKg != null)
-                                        Text(
-                                            '${pos.doseKg} ${pos.unite ?? ''}/kg')
-                                      else if (pos.doseKgMin != null)
-                                        Text(
-                                            '${pos.doseKgMin ?? '?'} - ${pos.doseKgMax ?? '?'} ${pos.unite ?? ''}/kg'),
+                                        Text(_formatDoseDisplay(pos.doseKg, pos.unite, true))
+                                      else if (pos.doseKgMin != null && pos.doseKgMax != null)
+                                        Text('${pos.doseKgMin} - ${pos.doseKgMax} ${_formatUnitDisplay(pos.unite, true)}'),
                                       
                                       if (pos.doseMax != null)
                                         Text(
-                                            'Max: ${pos.doseMax} ${pos.unite ?? ''}'),
+                                            'Max: ${pos.doseMax} ${pos.unite}'),
                                       if (pos.preparation != null)
                                         Text('Préparation: ${pos.preparation}'),
                                     ],
@@ -164,8 +186,6 @@ class PreviewScreen extends StatelessWidget {
                     }).toList(),
                     const SizedBox(height: 16),
                     // Fin des Indications et Posologies
-
-                    // PRÉCAUTIONS: Retiré (champ non existant)
 
                     // Contre-indications (affichage texte simple)
                     if (medication.contreIndications != null &&
@@ -302,8 +322,10 @@ class PreviewScreen extends StatelessWidget {
                         onPressed: () {
                           provider.addMedicationToList();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Médicament ajouté à la liste'),
+                            SnackBar(
+                              content: Text(provider.isEditingMode 
+                                  ? 'Médicament mis à jour'
+                                  : 'Médicament ajouté à la liste'),
                               backgroundColor: Colors.green,
                             ),
                           );
@@ -314,7 +336,9 @@ class PreviewScreen extends StatelessWidget {
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: const Text('Enregistrer & Nouveau'),
+                        child: Text(provider.isEditingMode 
+                            ? 'Enregistrer les modifications'
+                            : 'Enregistrer & Nouveau'),
                       ),
                     ),
                   ],

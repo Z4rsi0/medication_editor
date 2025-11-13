@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/medication_provider.dart';
-// **Vérifiez et ajustez ce chemin si nécessaire** (modèles dans lib/models)
-import '../models/medication.dart'; 
+import '../models/medication.dart';
+import 'general_info_screen.dart';
 
 class MedicationListScreen extends StatelessWidget {
   const MedicationListScreen({super.key});
@@ -263,6 +263,19 @@ class MedicationListScreen extends StatelessWidget {
                             ),
                           ],
                         ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit),
+                          color: Colors.blue,
+                          onPressed: () {
+                            provider.editMedication(index);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const GeneralInfoScreen(),
+                              ),
+                            );
+                          },
+                        ),
                         children: [
                           Padding(
                             padding: const EdgeInsets.all(16.0),
@@ -370,7 +383,7 @@ class MedicationListScreen extends StatelessWidget {
   // --- Le code de la boîte de dialogue d'exportation ---
 
   void _showExportDialog(BuildContext context, MedicationProvider provider) {
-    final jsonString = provider.exportToJson();
+    final jsonString = provider.exportToJsonSorted();
 
     showDialog(
       context: context,
@@ -383,10 +396,9 @@ class MedicationListScreen extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
-                // ignore: prefer_const_constructors
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.teal,
-                  borderRadius: const BorderRadius.only(
+                  borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(4),
                     topRight: Radius.circular(4),
                   ),
@@ -395,7 +407,7 @@ class MedicationListScreen extends StatelessWidget {
                   children: [
                     const Expanded(
                       child: Text(
-                        'Export JSON complet',
+                        'Export JSON complet (trié alphabétiquement)',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -441,8 +453,7 @@ class MedicationListScreen extends StatelessWidget {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content:
-                                  Text('JSON complet copié dans le presse-papier'),
+                              content: Text('JSON complet copié (prêt pour GitHub)'),
                               backgroundColor: Colors.green,
                             ),
                           );

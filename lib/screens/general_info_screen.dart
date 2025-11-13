@@ -15,7 +15,7 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nomController = TextEditingController();
   final _nomCommercialController = TextEditingController();
-  String? _selectedGalenique;
+  final _galeniqueController = TextEditingController();
 
   @override
   void initState() {
@@ -25,7 +25,7 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
     if (med != null) {
       _nomController.text = med.nom;
       _nomCommercialController.text = med.nomCommercial ?? '';
-      _selectedGalenique = med.galenique.isEmpty ? null : med.galenique;
+      _galeniqueController.text = med.galenique;
     }
   }
 
@@ -33,6 +33,7 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
   void dispose() {
     _nomController.dispose();
     _nomCommercialController.dispose();
+    _galeniqueController.dispose();
     super.dispose();
   }
 
@@ -42,7 +43,7 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
       provider.updateMedicationField(
         nom: _nomController.text.trim(),
         nomCommercial: _nomCommercialController.text.trim(),
-        galenique: _selectedGalenique ?? '',
+        galenique: _galeniqueController.text.trim(),
       );
 
       Navigator.push(
@@ -108,34 +109,57 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
               textCapitalization: TextCapitalization.characters,
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedGalenique,
-              decoration: const InputDecoration(
-                labelText: 'Forme galénique *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.science),
-              ),
-              items: MedicationConstants.galeniques
-                  .map((galenique) => DropdownMenuItem(
-                        value: galenique,
-                        child: Text(galenique),
-                      ))
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedGalenique = value;
+            Autocomplete<String>(
+              initialValue: TextEditingValue(text: _galeniqueController.text),
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return const Iterable<String>.empty();
+                }
+                return MedicationConstants.galeniques.where((String option) {
+                  return option
+                      .toLowerCase()
+                      .contains(textEditingValue.text.toLowerCase());
                 });
               },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'La forme galénique est obligatoire';
+              onSelected: (String selection) {
+                _galeniqueController.text = selection;
+              },
+              fieldViewBuilder: (BuildContext context,
+                  TextEditingController fieldTextEditingController,
+                  FocusNode fieldFocusNode,
+                  VoidCallback onFieldSubmitted) {
+                // Synchroniser avec notre controller
+                if (fieldTextEditingController.text != _galeniqueController.text) {
+                  fieldTextEditingController.text = _galeniqueController.text;
                 }
-                return null;
+                
+                // Écouter les changements
+                fieldTextEditingController.addListener(() {
+                  _galeniqueController.text = fieldTextEditingController.text;
+                });
+
+                return TextFormField(
+                  controller: fieldTextEditingController,
+                  focusNode: fieldFocusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Forme galénique *',
+                    hintText: 'Ex: Solution perfusion 10 mg/mL',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.science),
+                    helperText: 'Tapez pour voir les suggestions',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'La forme galénique est obligatoire';
+                    }
+                    return null;
+                  },
+                );
               },
             ),
             const SizedBox(height: 8),
             Text(
-              'Exemple: "Solution perfusion 10 mg/mL"',
+              'Suggestions disponibles ou saisissez votre propre galénique',
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
             const SizedBox(height: 32),

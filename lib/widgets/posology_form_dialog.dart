@@ -1,5 +1,7 @@
 // posology_form_dialog.dart
 
+// ignore_for_file: deprecated_member_use, unnecessary_const, unnecessary_to_list_in_spreads
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

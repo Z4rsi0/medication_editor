@@ -1,15 +1,18 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/medication.dart';
+import 'package:http/http.dart' as http;
 
 class MedicationProvider extends ChangeNotifier {
   final List<Medication> _medications = [];
   Medication? _currentMedication;
   Indication? _currentIndication;
+  int? _editingIndex;
 
   List<Medication> get medications => _medications;
   Medication? get currentMedication => _currentMedication;
   Indication? get currentIndication => _currentIndication;
+  bool get isEditingMode => _editingIndex != null;
 
   void startNewMedication() {
     _currentMedication = Medication(
@@ -18,6 +21,7 @@ class MedicationProvider extends ChangeNotifier {
       indications: [],
     );
     _currentIndication = null;
+    _editingIndex = null;
     notifyListeners();
   }
 
@@ -104,7 +108,16 @@ class MedicationProvider extends ChangeNotifier {
 
   void addMedicationToList() {
     if (_currentMedication == null) return;
-    _medications.add(_currentMedication!);
+    
+    if (_editingIndex != null) {
+      // Mode édition : remplacer le médicament existant
+      _medications[_editingIndex!] = _currentMedication!;
+      _editingIndex = null;
+    } else {
+      // Mode création : ajouter un nouveau médicament
+      _medications.add(_currentMedication!);
+    }
+    
     _currentMedication = null;
     _currentIndication = null;
     notifyListeners();
@@ -119,8 +132,16 @@ class MedicationProvider extends ChangeNotifier {
 
   void editMedication(int index) {
     if (index >= 0 && index < _medications.length) {
-      _currentMedication = _medications[index];
-      _medications.removeAt(index);
+      _editingIndex = index;
+      _currentMedication = Medication(
+        nom: _medications[index].nom,
+        nomCommercial: _medications[index].nomCommercial,
+        galenique: _medications[index].galenique,
+        indications: List.from(_medications[index].indications),
+        contreIndications: _medications[index].contreIndications,
+        surdosage: _medications[index].surdosage,
+        aSavoir: _medications[index].aSavoir,
+      );
       _currentIndication = null;
       notifyListeners();
     }
@@ -130,17 +151,29 @@ class MedicationProvider extends ChangeNotifier {
     _medications.clear();
     _currentMedication = null;
     _currentIndication = null;
+    _editingIndex = null;
     notifyListeners();
   }
 
   void cancelCurrentMedication() {
     _currentMedication = null;
     _currentIndication = null;
+    _editingIndex = null;
     notifyListeners();
   }
 
   String exportToJson() {
     final list = _medications.map((m) => m.toJson()).toList();
+    return const JsonEncoder.withIndent('  ').convert(list);
+  }
+
+  // Générer le JSON final trié alphabétiquement
+  String exportToJsonSorted() {
+    // Créer une copie de la liste et trier par nom
+    final sortedMeds = List<Medication>.from(_medications);
+    sortedMeds.sort((a, b) => a.nom.toLowerCase().compareTo(b.nom.toLowerCase()));
+    
+    final list = sortedMeds.map((m) => m.toJson()).toList();
     return const JsonEncoder.withIndent('  ').convert(list);
   }
 
@@ -156,6 +189,23 @@ class MedicationProvider extends ChangeNotifier {
       }
     } catch (e) {
       throw Exception('Erreur lors du chargement du JSON: $e');
+    }
+  }
+
+  // Charger les médicaments depuis GitHub
+  Future<void> loadFromGitHub() async {
+    const url = 'https://raw.githubusercontent.com/Z4rsi0/ped_app_data/main/assets/medicaments_pediatrie.json';
+    
+    try {
+      final response = await http.get(Uri.parse(url));
+      
+      if (response.statusCode == 200) {
+        loadFromJson(response.body);
+      } else {
+        throw Exception('Erreur HTTP: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erreur lors du chargement depuis GitHub: $e');
     }
   }
 }

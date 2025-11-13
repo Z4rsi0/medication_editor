@@ -4,15 +4,88 @@ import '../services/medication_provider.dart';
 import 'medication_list_screen.dart';
 import 'general_info_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMedicationsFromGitHub();
+  }
+
+  Future<void> _loadMedicationsFromGitHub() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await Provider.of<MedicationProvider>(context, listen: false)
+          .loadFromGitHub();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Médicaments chargés depuis GitHub'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Éditeur de Médicaments'),
+          backgroundColor: Colors.teal,
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Chargement des médicaments depuis GitHub...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Éditeur de Médicaments'),
         backgroundColor: Colors.teal,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadMedicationsFromGitHub,
+            tooltip: 'Recharger depuis GitHub',
+          ),
+        ],
       ),
       body: Center(
         child: Padding(
@@ -34,13 +107,17 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Application d\'édition pour ped_app',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-                textAlign: TextAlign.center,
+              Consumer<MedicationProvider>(
+                builder: (context, provider, child) {
+                  return Text(
+                    '${provider.medications.length} médicaments chargés',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                    ),
+                    textAlign: TextAlign.center,
+                  );
+                },
               ),
               const SizedBox(height: 48),
               SizedBox(
