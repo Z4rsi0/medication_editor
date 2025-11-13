@@ -29,6 +29,7 @@ class MedicationConstants {
     'g',
     'UI',
     'mL',
+    'gouttes',
     'UI/kg/h',
     'µg/kg/min',
     'mg/kg/h',
@@ -39,6 +40,7 @@ class MedicationConstants {
   static const List<String> voies = [
     'PO',
     'IV',
+    'IV/IO',
     'IM',
     'SC',
     'Inhalation',
