@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_constructors
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/medication_provider.dart';
@@ -124,8 +126,8 @@ void _showGitHubPublishDialog(
     barrierDismissible: false,
     builder: (context) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: const Row(
-          children: [
+        title: Row(
+          children: const [
             Icon(Icons.cloud_upload, color: Colors.blue),
             SizedBox(width: 12),
             Text('Publier sur GitHub'),

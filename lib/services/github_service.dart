@@ -169,4 +169,203 @@ class GitHubService {
       return null;
     }
   }
+
+  // ============================================================
+  // MÉTHODES POUR LES PROTOCOLES
+  // ============================================================
+
+  /// Liste tous les fichiers de protocoles dans le dossier assets/protocoles
+  Future<List<String>> listProtocols() async {
+    if (!isConfigured) return [];
+
+    try {
+      const protocolsPath = 'assets/protocoles';
+      final response = await http.get(
+        Uri.parse(
+            'https://api.github.com/repos/$_repoOwner/$_repoName/contents/$protocolsPath?ref=$_branch'),
+        headers: {
+          'Authorization': 'token $_token',
+          'Accept': 'application/vnd.github.v3+json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> contents = json.decode(response.body);
+        // Filtrer uniquement les fichiers .json
+        return contents
+            .where((item) =>
+                item['type'] == 'file' && item['name'].toString().endsWith('.json'))
+            .map((item) => item['name'] as String)
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Erreur listage protocoles: $e');
+      return [];
+    }
+  }
+
+  /// Récupère le contenu d'un protocole spécifique
+  Future<String?> fetchProtocol(String fileName) async {
+    if (!isConfigured) return null;
+
+    try {
+      final protocolPath = 'assets/protocoles/$fileName';
+      final response = await http.get(
+        Uri.parse(
+            'https://api.github.com/repos/$_repoOwner/$_repoName/contents/$protocolPath?ref=$_branch'),
+        headers: {
+          'Authorization': 'token $_token',
+          'Accept': 'application/vnd.github.v3+json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final contentBase64 = data['content'] as String;
+        final cleanBase64 = contentBase64.replaceAll('\n', '');
+        final decodedBytes = base64Decode(cleanBase64);
+        return utf8.decode(decodedBytes);
+      }
+      return null;
+    } catch (e) {
+      print('Erreur récupération protocole $fileName: $e');
+      return null;
+    }
+  }
+
+  /// Récupère le SHA d'un fichier protocole spécifique
+  Future<String?> _getProtocolFileSha(String fileName) async {
+    if (!isConfigured) return null;
+
+    try {
+      final protocolPath = 'assets/protocoles/$fileName';
+      final response = await http.get(
+        Uri.parse(
+            'https://api.github.com/repos/$_repoOwner/$_repoName/contents/$protocolPath?ref=$_branch'),
+        headers: {
+          'Authorization': 'token $_token',
+          'Accept': 'application/vnd.github.v3+json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['sha'] as String?;
+      }
+      return null;
+    } catch (e) {
+      print('Erreur récupération SHA protocole: $e');
+      return null;
+    }
+  }
+
+  /// Publie un protocole sur GitHub (crée ou met à jour)
+  Future<bool> publishProtocol({
+    required String fileName,
+    required String jsonContent,
+    required String commitMessage,
+  }) async {
+    if (!isConfigured) {
+      throw Exception('GitHub non configuré - vérifiez votre fichier .env');
+    }
+
+    try {
+      final protocolPath = 'assets/protocoles/$fileName';
+      
+      // Récupère le SHA si le fichier existe déjà
+      final sha = await _getProtocolFileSha(fileName);
+
+      // Encode le contenu en base64
+      final contentBase64 = base64Encode(utf8.encode(jsonContent));
+
+      // Prépare le body de la requête
+      final body = {
+        'message': commitMessage,
+        'content': contentBase64,
+        'branch': _branch,
+      };
+
+      // Ajoute le SHA si le fichier existe (pour update)
+      if (sha != null) {
+        body['sha'] = sha;
+      }
+
+      // Envoie la requête à GitHub
+      final response = await http.put(
+        Uri.parse(
+            'https://api.github.com/repos/$_repoOwner/$_repoName/contents/$protocolPath'),
+        headers: {
+          'Authorization': 'token $_token',
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(body),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Protocole $fileName publié avec succès sur GitHub');
+        return true;
+      } else {
+        print('❌ Erreur publication protocole: ${response.statusCode}');
+        print('Response: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Exception lors de la publication du protocole: $e');
+      return false;
+    }
+  }
+
+  /// Supprime un protocole de GitHub
+  Future<bool> deleteProtocol({
+    required String fileName,
+    required String commitMessage,
+  }) async {
+    if (!isConfigured) {
+      throw Exception('GitHub non configuré - vérifiez votre fichier .env');
+    }
+
+    try {
+      final protocolPath = 'assets/protocoles/$fileName';
+      
+      // Récupère le SHA (obligatoire pour la suppression)
+      final sha = await _getProtocolFileSha(fileName);
+      if (sha == null) {
+        print('❌ Impossible de trouver le fichier $fileName pour suppression');
+        return false;
+      }
+
+      // Prépare le body de la requête
+      final body = {
+        'message': commitMessage,
+        'sha': sha,
+        'branch': _branch,
+      };
+
+      // Envoie la requête DELETE à GitHub
+      final response = await http.delete(
+        Uri.parse(
+            'https://api.github.com/repos/$_repoOwner/$_repoName/contents/$protocolPath'),
+        headers: {
+          'Authorization': 'token $_token',
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(body),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        print('✅ Protocole $fileName supprimé avec succès de GitHub');
+        return true;
+      } else {
+        print('❌ Erreur suppression protocole: ${response.statusCode}');
+        print('Response: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Exception lors de la suppression du protocole: $e');
+      return false;
+    }
+  }
 }

@@ -1,9 +1,10 @@
-// ignore_for_file: prefer_single_quotes, avoid_redundant_argument_values
+// ignore_for_file: avoid_redundant_argument_values, prefer_single_quotes
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/medication_provider.dart';
+import 'services/protocol_provider.dart';
 import 'services/github_service.dart';
 import 'screens/home_screen.dart';
 
@@ -24,8 +25,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => MedicationProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => MedicationProvider()),
+        ChangeNotifierProvider(create: (_) => ProtocolProvider()),
+      ],
       child: MaterialApp(
         title: 'Medication Editor',
         debugShowCheckedModeBanner: false,
