@@ -154,21 +154,22 @@ class PosologyScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const SizedBox(height: 4),
-                                  // Réf. à 'frequency' (ligne 144) RÉTIRÉE
+                                  
+                                  // LOGIQUE D'AFFICHAGE MISE À JOUR : PRIORITÉ AUX SCHÉMAS COMPLEXES
                                   if (posology.tranches != null && posology.tranches!.isNotEmpty)
-                                    Text('${posology.tranches!.length} tranche(s) de poids/âge')
-                                  else if (posology.doses != null)
-                                    Text('Schéma: ${posology.doses}')
+                                    Text('Dosage par ${posology.tranches!.length} tranche(s) de poids/âge')
+                                  else if (posology.doses != null && posology.doses!.isNotEmpty)
+                                    Text('Schéma complexe: ${posology.doses}')
                                   else if (posology.doseKg != null)
                                     Text('Dose: ${posology.doseKg} ${posology.unite}/kg')
                                   else if (posology.doseKgMin != null)
                                     Text('Dose: ${posology.doseKgMin}-${posology.doseKgMax} ${posology.unite}/kg'),
+                                  
                                   if (posology.doseMax != null)
                                     Text('Max: ${posology.doseMax} ${posology.unite}'),
                                   if (posology.preparation != null)
                                     Text('Préparation: ${posology.preparation}'),
                                   
-                                  // Réf. à 'precautions' (lignes 178, 179, 193) RÉTIRÉE
                                 ],
                               ),
                               trailing: Row(
