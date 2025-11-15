@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/protocol_provider.dart';
-import '../models/protocol.dart' as model; // 👈 CORRECTION : Ajout du préfixe 'as model'
+import '../services/medication_provider.dart';
+import '../models/protocol.dart' as model;
 
 class ElementFormDialog extends StatefulWidget {
   final int? index;
@@ -21,7 +22,6 @@ class _ElementFormDialogState extends State<ElementFormDialog> {
   // Controllers pour médicament
   final _nomMedicamentController = TextEditingController();
   final _indicationController = TextEditingController();
-  final _voieController = TextEditingController();
 
   @override
   void initState() {
@@ -30,16 +30,13 @@ class _ElementFormDialogState extends State<ElementFormDialog> {
       final provider = Provider.of<ProtocolProvider>(context, listen: false);
       final element = provider.currentEtape!.elements[widget.index!];
 
-      // CORRECTION : Utilisation de model.ElementTexte
       if (element is model.ElementTexte) {
         _isTexte = true;
         _texteController.text = element.texte;
-      // CORRECTION : Utilisation de model.ElementMedicament
       } else if (element is model.ElementMedicament) {
         _isTexte = false;
         _nomMedicamentController.text = element.medicament.nom;
         _indicationController.text = element.medicament.indication;
-        _voieController.text = element.medicament.voie;
       }
     }
   }
@@ -49,27 +46,41 @@ class _ElementFormDialogState extends State<ElementFormDialog> {
     _texteController.dispose();
     _nomMedicamentController.dispose();
     _indicationController.dispose();
-    _voieController.dispose();
     super.dispose();
+  }
+
+  // Récupère la liste des noms de médicaments uniques
+  List<String> _getMedicationNames(MedicationProvider provider) {
+    return provider.medications
+        .map((med) => med.nom)
+        .toSet()
+        .toList()
+      ..sort();
+  }
+
+  // Récupère la liste des indications pour un médicament donné
+  List<String> _getIndicationsForMedication(
+      MedicationProvider provider, String medicationName) {
+    final medication = provider.medications
+        .firstWhere((med) => med.nom == medicationName, orElse: () => provider.medications.first);
+    
+    return medication.indications
+        .map((ind) => ind.label)
+        .toList();
   }
 
   void _saveElement() {
     if (_formKey.currentState!.validate()) {
       final provider = Provider.of<ProtocolProvider>(context, listen: false);
 
-      // CORRECTION : Déclaration avec model.Element
       model.Element element;
       if (_isTexte) {
-        // CORRECTION : Instanciation avec model.ElementTexte
         element = model.ElementTexte(texte: _texteController.text.trim());
       } else {
-        // CORRECTION : Instanciation avec model.ElementMedicament
         element = model.ElementMedicament(
-          // CORRECTION : Instanciation avec model.MedicamentReference
           medicament: model.MedicamentReference(
             nom: _nomMedicamentController.text.trim(),
             indication: _indicationController.text.trim(),
-            voie: _voieController.text.trim(),
           ),
         );
       }
@@ -86,6 +97,9 @@ class _ElementFormDialogState extends State<ElementFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final medicationProvider = Provider.of<MedicationProvider>(context);
+    final medicationNames = _getMedicationNames(medicationProvider);
+
     return AlertDialog(
       title: Text(widget.index == null
           ? 'Ajouter un élément'
@@ -164,54 +178,119 @@ class _ElementFormDialogState extends State<ElementFormDialog> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                TextFormField(
-                  controller: _nomMedicamentController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom du médicament',
-                    hintText: 'Ex: Midazolam',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.medication),
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Le nom est obligatoire';
+                
+                // Nom du médicament avec autocomplétion
+                Autocomplete<String>(
+                  initialValue: TextEditingValue(text: _nomMedicamentController.text),
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return medicationNames;
                     }
-                    return null;
+                    return medicationNames.where((String option) {
+                      return option
+                          .toLowerCase()
+                          .contains(textEditingValue.text.toLowerCase());
+                    });
+                  },
+                  onSelected: (String selection) {
+                    setState(() {
+                      _nomMedicamentController.text = selection;
+                      // Effacer l'indication pour forcer l'utilisateur à en choisir une nouvelle
+                      _indicationController.clear();
+                    });
+                  },
+                  fieldViewBuilder: (BuildContext context,
+                      TextEditingController fieldTextEditingController,
+                      FocusNode fieldFocusNode,
+                      VoidCallback onFieldSubmitted) {
+                    // Synchroniser avec notre controller
+                    if (fieldTextEditingController.text != _nomMedicamentController.text) {
+                      fieldTextEditingController.text = _nomMedicamentController.text;
+                    }
+                    
+                    // Écouter les changements
+                    fieldTextEditingController.addListener(() {
+                      _nomMedicamentController.text = fieldTextEditingController.text;
+                    });
+
+                    return TextFormField(
+                      controller: fieldTextEditingController,
+                      focusNode: fieldFocusNode,
+                      decoration: const InputDecoration(
+                        labelText: 'Nom du médicament *',
+                        hintText: 'Ex: Midazolam',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.medication),
+                        helperText: 'Sélectionnez depuis la liste ou saisissez',
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Le nom est obligatoire';
+                        }
+                        return null;
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: _indicationController,
-                  decoration: const InputDecoration(
-                    labelText: 'Indication',
-                    hintText: 'Ex: Convulsions',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.info_outline),
-                  ),
-                  textCapitalization: TextCapitalization.sentences,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'L\'indication est obligatoire';
+                
+                // Indication avec autocomplétion basée sur le médicament sélectionné
+                Autocomplete<String>(
+                  initialValue: TextEditingValue(text: _indicationController.text),
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (_nomMedicamentController.text.trim().isEmpty) {
+                      return const Iterable<String>.empty();
                     }
-                    return null;
+                    
+                    final indications = _getIndicationsForMedication(
+                        medicationProvider, _nomMedicamentController.text.trim());
+                    
+                    if (textEditingValue.text.isEmpty) {
+                      return indications;
+                    }
+                    
+                    return indications.where((String option) {
+                      return option
+                          .toLowerCase()
+                          .contains(textEditingValue.text.toLowerCase());
+                    });
                   },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _voieController,
-                  decoration: const InputDecoration(
-                    labelText: 'Voie d\'administration',
-                    hintText: 'Ex: IV',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.route),
-                  ),
-                  textCapitalization: TextCapitalization.characters,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'La voie est obligatoire';
+                  onSelected: (String selection) {
+                    _indicationController.text = selection;
+                  },
+                  fieldViewBuilder: (BuildContext context,
+                      TextEditingController fieldTextEditingController,
+                      FocusNode fieldFocusNode,
+                      VoidCallback onFieldSubmitted) {
+                    // Synchroniser avec notre controller
+                    if (fieldTextEditingController.text != _indicationController.text) {
+                      fieldTextEditingController.text = _indicationController.text;
                     }
-                    return null;
+                    
+                    // Écouter les changements
+                    fieldTextEditingController.addListener(() {
+                      _indicationController.text = fieldTextEditingController.text;
+                    });
+
+                    return TextFormField(
+                      controller: fieldTextEditingController,
+                      focusNode: fieldFocusNode,
+                      decoration: const InputDecoration(
+                        labelText: 'Indication *',
+                        hintText: 'Ex: Convulsions',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.info_outline),
+                        helperText: 'Sélectionnez l\'indication depuis la liste',
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'L\'indication est obligatoire';
+                        }
+                        return null;
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 8),
@@ -220,7 +299,7 @@ class _ElementFormDialogState extends State<ElementFormDialog> {
                   child: const Padding(
                     padding: EdgeInsets.all(8.0),
                     child: Text(
-                      'L\'app recherchera automatiquement ce médicament et affichera la posologie calculée',
+                      'L\'app recherchera automatiquement ce médicament avec cette indication et affichera toutes les posologies disponibles',
                       style: TextStyle(fontSize: 12),
                     ),
                   ),

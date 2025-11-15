@@ -202,8 +202,7 @@ class _ProtocolStepEditorScreenState extends State<ProtocolStepEditorScreen> {
                                           fontWeight: FontWeight.bold),
                                     ),
                               subtitle: element is ElementMedicament
-                                  ? Text(
-                                      '${element.medicament.indication} - ${element.medicament.voie}')
+                                  ? Text(element.medicament.indication)
                                   : null,
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -226,7 +225,7 @@ class _ProtocolStepEditorScreenState extends State<ProtocolStepEditorScreen> {
                               ),
                             ),
                           );
-                        }).toList(),
+                        }),
                     ],
                   ),
                 ),

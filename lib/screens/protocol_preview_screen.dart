@@ -194,7 +194,7 @@ class ProtocolPreviewScreen extends StatelessWidget {
                                                 ),
                                               ),
                                               Text(
-                                                '${element.medicament.indication} - ${element.medicament.voie}',
+                                                element.medicament.indication,
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   color: Colors.grey[600],
@@ -208,7 +208,7 @@ class ProtocolPreviewScreen extends StatelessWidget {
                                   );
                                 }
                                 return const SizedBox.shrink();
-                              }).toList(),
+                              }),
                               if (etape.attention != null) ...[
                                 const SizedBox(height: 8),
                                 Container(
@@ -240,7 +240,7 @@ class ProtocolPreviewScreen extends StatelessWidget {
                           ),
                         ),
                       );
-                    }).toList(),
+                    }),
                     const SizedBox(height: 16),
 
                     const Divider(),
@@ -340,7 +340,6 @@ class ProtocolPreviewScreen extends StatelessWidget {
                     Expanded(
                       flex: 2,
                       child: ElevatedButton(
-                        // 👈 MODIFICATION CLÉ ICI
                         onPressed: () async {
                           // 1. Capture de la référence et du mode AVANT d'appeler addProtocolToList()
                           final protocolToPublish = protocol;
@@ -373,7 +372,6 @@ class ProtocolPreviewScreen extends StatelessWidget {
                             Navigator.popUntil(context, (route) => route.isFirst);
                           }
                         },
-                        // 👆 FIN DE LA MODIFICATION CLÉ
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,

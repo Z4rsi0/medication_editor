@@ -171,19 +171,16 @@ class ElementMedicament implements Element {
 class MedicamentReference {
   String nom;
   String indication;
-  String voie;
 
   MedicamentReference({
     required this.nom,
     required this.indication,
-    required this.voie,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'nom': nom,
       'indication': indication,
-      'voie': voie,
     };
   }
 
@@ -191,7 +188,6 @@ class MedicamentReference {
     return MedicamentReference(
       nom: json['nom'] ?? '',
       indication: json['indication'] ?? '',
-      voie: json['voie'] ?? '',
     );
   }
 }

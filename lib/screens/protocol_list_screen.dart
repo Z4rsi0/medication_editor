@@ -91,12 +91,27 @@ class ProtocolListScreen extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  '${provider.protocols.length} protocole(s)',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${provider.protocols.length} protocole(s)',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _showExportDialog(context, provider),
+                      icon: const Icon(Icons.download),
+                      label: const Text('Exporter JSON'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Expanded(
@@ -194,17 +209,6 @@ class ProtocolListScreen extends StatelessWidget {
                                     ),
                                     TextButton.icon(
                                       onPressed: () {
-                                        _showPublishDialog(
-                                            context, provider, protocol);
-                                      },
-                                      icon: const Icon(Icons.cloud_upload),
-                                      label: const Text('Publier'),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: Colors.blue,
-                                      ),
-                                    ),
-                                    TextButton.icon(
-                                      onPressed: () {
                                         _showDeleteDialog(
                                             context, provider, index, protocol);
                                       },
@@ -232,10 +236,58 @@ class ProtocolListScreen extends StatelessWidget {
     );
   }
 
-  void _showPublishDialog(
-      BuildContext context, ProtocolProvider provider, Protocol protocol) {
+  void _showExportDialog(BuildContext context, ProtocolProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.file_download, color: Colors.blue),
+            SizedBox(width: 12),
+            Text('Exporter les protocoles'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Vous avez ${provider.protocols.length} protocole(s) à exporter.',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Que souhaitez-vous faire ?',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _showGitHubPublishDialog(context, provider);
+            },
+            icon: const Icon(Icons.cloud_upload),
+            label: const Text('Publier sur GitHub'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showGitHubPublishDialog(
+      BuildContext context, ProtocolProvider provider) {
     final commitMessageController = TextEditingController(
-      text: 'Mise à jour du protocole: ${protocol.nom}',
+      text: 'Mise à jour des protocoles depuis Medication Editor',
     );
     bool isPublishing = false;
 
@@ -256,12 +308,8 @@ class ProtocolListScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Protocole: ${protocol.nom}',
+                'Publication de ${provider.protocols.length} protocole(s) sur GitHub.',
                 style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'Fichier: ${protocol.fileName}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -294,7 +342,7 @@ class ProtocolListScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
-                        'Le protocole sera publié dans assets/protocoles/',
+                        'Chaque protocole sera publié dans assets/protocoles/.',
                         style: TextStyle(fontSize: 12),
                       ),
                     ),
@@ -330,10 +378,21 @@ class ProtocolListScreen extends StatelessWidget {
                       setState(() => isPublishing = true);
 
                       try {
-                        final success = await provider.publishProtocolToGitHub(
-                          protocol,
-                          commitMessageController.text.trim(),
-                        );
+                        int successCount = 0;
+                        int failCount = 0;
+
+                        for (final protocol in provider.protocols) {
+                          final success =
+                              await provider.publishProtocolToGitHub(
+                            protocol,
+                            commitMessageController.text.trim(),
+                          );
+                          if (success) {
+                            successCount++;
+                          } else {
+                            failCount++;
+                          }
+                        }
 
                         if (context.mounted) {
                           Navigator.pop(context);
@@ -341,12 +400,13 @@ class ProtocolListScreen extends StatelessWidget {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                success
-                                    ? '✅ Protocole publié avec succès sur GitHub !'
-                                    : '❌ Échec de la publication sur GitHub',
+                                failCount == 0
+                                    ? '✅ $successCount protocole(s) publié(s) avec succès !'
+                                    : '⚠️ $successCount succès, $failCount échec(s)',
                               ),
-                              backgroundColor:
-                                  success ? Colors.green : Colors.red,
+                              backgroundColor: failCount == 0
+                                  ? Colors.green
+                                  : Colors.orange,
                               duration: const Duration(seconds: 3),
                             ),
                           );
@@ -395,25 +455,7 @@ class ProtocolListScreen extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Supprimer ?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Voulez-vous supprimer "${protocol.nom}" ?'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Note: Ceci supprime uniquement de cette liste. Pour supprimer de GitHub, utilisez l\'option "Supprimer de GitHub".',
-                style: TextStyle(fontSize: 12, color: Colors.red),
-              ),
-            ),
-          ],
-        ),
+        content: Text('Voulez-vous supprimer "${protocol.nom}" de la liste ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -427,7 +469,7 @@ class ProtocolListScreen extends StatelessWidget {
             style: TextButton.styleFrom(
               foregroundColor: Colors.red,
             ),
-            child: const Text('Supprimer de la liste'),
+            child: const Text('Supprimer'),
           ),
         ],
       ),

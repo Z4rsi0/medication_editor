@@ -4,7 +4,8 @@ import '../services/medication_provider.dart';
 import '../services/protocol_provider.dart';
 import 'medication_list_screen.dart';
 import 'general_info_screen.dart';
-import 'protocol_home_screen.dart';
+import 'protocol_list_screen.dart';
+import 'protocol_general_info_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,34 +20,42 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMedicationsFromGitHub();
+    _loadDataFromGitHub();
   }
 
-  Future<void> _loadMedicationsFromGitHub() async {
+  Future<void> _loadDataFromGitHub() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
     });
 
     try {
+      // Charger les médicaments
+      if (!mounted) return;
       await Provider.of<MedicationProvider>(context, listen: false)
           .loadFromGitHub();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Médicaments chargés depuis GitHub'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      
+      // Charger les protocoles
+      if (!mounted) return;
+      await Provider.of<ProtocolProvider>(context, listen: false)
+          .loadAllProtocolsFromGitHub();
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Données chargées depuis GitHub'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -70,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 16),
-              Text('Chargement des médicaments depuis GitHub...'),
+              Text('Chargement des données depuis GitHub...'),
             ],
           ),
         ),
@@ -84,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadMedicationsFromGitHub,
+            onPressed: _loadDataFromGitHub,
             tooltip: 'Recharger depuis GitHub',
           ),
         ],
@@ -273,26 +282,56 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const ProtocolHomeScreen(),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Provider.of<ProtocolProvider>(context,
+                                        listen: false)
+                                    .startNewProtocol();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ProtocolGeneralInfoScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.add),
+                              label: const Text('Nouveau'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
                               ),
-                            );
-                          },
-                          icon: const Icon(Icons.arrow_forward),
-                          label: const Text('Gérer les protocoles'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ProtocolListScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.list),
+                              label: const Text('Liste'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.blue,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                side: const BorderSide(
+                                    color: Colors.blue, width: 2),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
