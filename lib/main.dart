@@ -1,64 +1,88 @@
-// ignore_for_file: avoid_redundant_argument_values, prefer_single_quotes
-
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'services/medication_provider.dart';
-import 'services/protocol_provider.dart';
-import 'services/github_service.dart';
-import 'screens/home_screen.dart';
+import 'screens/protocol_editor_screen.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Charger le fichier .env
-  await dotenv.load(fileName: ".env");
-  
-  // Initialiser le service GitHub
-  await GitHubService().initialize();
-  
-  runApp(const MyApp());
+void main() {
+  runApp(const MedicationEditorApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MedicationEditorApp extends StatelessWidget {
+  const MedicationEditorApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => MedicationProvider()),
-        ChangeNotifierProvider(create: (_) => ProtocolProvider()),
-      ],
-      child: MaterialApp(
-        title: 'Medication Editor',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          primarySwatch: Colors.teal,
-          useMaterial3: true,
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            filled: true,
-            fillColor: Colors.grey[50],
+    return MaterialApp(
+      title: 'Medication Editor',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        useMaterial3: true,
+      ),
+      home: const MainScreen(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _pages = [
+    const _MedicamentsPlaceholder(), // À remplacer par l'écran existant
+    const ProtocolListScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.medication_outlined),
+            selectedIcon: Icon(Icons.medication),
+            label: 'Médicaments',
           ),
-          cardTheme: CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+          NavigationDestination(
+            icon: Icon(Icons.description_outlined),
+            selectedIcon: Icon(Icons.description),
+            label: 'Protocoles',
           ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Placeholder pour l'écran des médicaments existant
+class _MedicamentsPlaceholder extends StatelessWidget {
+  const _MedicamentsPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Médicaments'),
+      ),
+      body: const Center(
+        child: Text(
+          'Écran des médicaments existant\n(À intégrer)',
+          textAlign: TextAlign.center,
         ),
-        home: const HomeScreen(),
       ),
     );
   }
