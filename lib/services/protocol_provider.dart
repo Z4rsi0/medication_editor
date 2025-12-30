@@ -1,276 +1,166 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../models/protocol.dart';
+import '../models/protocol_model.dart'; // Le NOUVEAU modèle
 import 'github_service.dart';
 
 class ProtocolProvider extends ChangeNotifier {
-  final List<Protocol> _protocols = [];
-  Protocol? _currentProtocol;
-  Etape? _currentEtape;
-  int? _editingProtocolIndex;
-  int? _editingEtapeIndex;
   final GitHubService _gitHub = GitHubService();
+  
+  // Liste des protocoles chargée depuis GitHub
+  List<Protocol> _protocols = [];
+  List<Protocol> get protocols => List.unmodifiable(_protocols);
 
-  List<Protocol> get protocols => _protocols;
-  Protocol? get currentProtocol => _currentProtocol;
-  Etape? get currentEtape => _currentEtape;
-  bool get isEditingProtocol => _editingProtocolIndex != null;
-  bool get isEditingEtape => _editingEtapeIndex != null;
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
 
-  // ============================================================
-  // GESTION DES PROTOCOLES
-  // ============================================================
-
-  void startNewProtocol() {
-    _currentProtocol = Protocol(
-      nom: '',
-      description: '',
-      etapes: [],
-    );
-    _currentEtape = null;
-    _editingProtocolIndex = null;
-    _editingEtapeIndex = null;
-    notifyListeners();
-  }
-
-  void updateProtocolField({
-    String? nom,
-    String? description,
-  }) {
-    if (_currentProtocol == null) return;
-
-    if (nom != null) _currentProtocol!.nom = nom;
-    if (description != null) _currentProtocol!.description = description;
-
-    notifyListeners();
-  }
-
-  void addProtocolToList() {
-    if (_currentProtocol == null) return;
-
-    if (_editingProtocolIndex != null) {
-      // Mode édition : remplacer le protocole existant
-      _protocols[_editingProtocolIndex!] = _currentProtocol!;
-      _editingProtocolIndex = null;
-    } else {
-      // Mode création : ajouter un nouveau protocole
-      _protocols.add(_currentProtocol!);
-    }
-
-    _currentProtocol = null;
-    _currentEtape = null;
-    notifyListeners();
-  }
-
-  void editProtocol(int index) {
-    if (index >= 0 && index < _protocols.length) {
-      _editingProtocolIndex = index;
-      _currentProtocol = Protocol(
-        nom: _protocols[index].nom,
-        description: _protocols[index].description,
-        etapes: List.from(_protocols[index].etapes),
-      );
-      _currentEtape = null;
-      notifyListeners();
-    }
-  }
-
-  void removeProtocol(int index) {
-    if (index >= 0 && index < _protocols.length) {
-      _protocols.removeAt(index);
-      notifyListeners();
-    }
-  }
-
-  void cancelCurrentProtocol() {
-    _currentProtocol = null;
-    _currentEtape = null;
-    _editingProtocolIndex = null;
-    _editingEtapeIndex = null;
-    notifyListeners();
-  }
-
-  void clearAllProtocols() {
-    _protocols.clear();
-    _currentProtocol = null;
-    _currentEtape = null;
-    _editingProtocolIndex = null;
-    _editingEtapeIndex = null;
-    notifyListeners();
-  }
-
-  // ============================================================
-  // GESTION DES ÉTAPES
-  // ============================================================
-
-  void startNewEtape() {
-    _currentEtape = Etape(
-      titre: '',
-      elements: [],
-    );
-    _editingEtapeIndex = null;
-    notifyListeners();
-  }
-
-  void updateEtapeField({
-    String? titre,
-    String? temps,
-    String? attention,
-  }) {
-    if (_currentEtape == null) return;
-
-    if (titre != null) _currentEtape!.titre = titre;
-    if (temps != null) _currentEtape!.temps = temps;
-    if (attention != null) _currentEtape!.attention = attention;
-
-    notifyListeners();
-  }
-
-  void addElementToEtape(Element element) {
-    if (_currentEtape == null) return;
-    _currentEtape!.elements.add(element);
-    notifyListeners();
-  }
-
-  void updateElement(int index, Element element) {
-    if (_currentEtape == null) return;
-    if (index >= 0 && index < _currentEtape!.elements.length) {
-      _currentEtape!.elements[index] = element;
-      notifyListeners();
-    }
-  }
-
-  void removeElement(int index) {
-    if (_currentEtape == null) return;
-    if (index >= 0 && index < _currentEtape!.elements.length) {
-      _currentEtape!.elements.removeAt(index);
-      notifyListeners();
-    }
-  }
-
-  void saveCurrentEtape() {
-    if (_currentProtocol == null || _currentEtape == null) return;
-    if (_currentEtape!.elements.isEmpty) return;
-
-    if (_editingEtapeIndex != null) {
-      // Mode édition : remplacer l'étape existante
-      _currentProtocol!.etapes[_editingEtapeIndex!] = _currentEtape!;
-      _editingEtapeIndex = null;
-    } else {
-      // Mode création : ajouter une nouvelle étape
-      _currentProtocol!.etapes.add(_currentEtape!);
-    }
-
-    _currentEtape = null;
-    notifyListeners();
-  }
-
-  void editEtape(int index) {
-    if (_currentProtocol == null) return;
-    if (index >= 0 && index < _currentProtocol!.etapes.length) {
-      _editingEtapeIndex = index;
-      final etape = _currentProtocol!.etapes[index];
-      _currentEtape = Etape(
-        titre: etape.titre,
-        temps: etape.temps,
-        elements: List.from(etape.elements),
-        attention: etape.attention,
-      );
-      notifyListeners();
-    }
-  }
-
-  void removeEtape(int index) {
-    if (_currentProtocol == null) return;
-    if (index >= 0 && index < _currentProtocol!.etapes.length) {
-      _currentProtocol!.etapes.removeAt(index);
-      notifyListeners();
-    }
-  }
-
-  void cancelCurrentEtape() {
-    _currentEtape = null;
-    _editingEtapeIndex = null;
-    notifyListeners();
-  }
-
-  // ============================================================
-  // EXPORT / IMPORT JSON
-  // ============================================================
-
-  String exportProtocolToJson(Protocol protocol) {
-    return protocol.toJsonString();
-  }
-
-  void loadProtocolFromJson(String jsonString) {
-    try {
-      final decoded = jsonDecode(jsonString);
-      final protocol = Protocol.fromJson(decoded);
-      _protocols.add(protocol);
-      notifyListeners();
-    } catch (e) {
-      throw Exception('Erreur lors du chargement du protocole: $e');
-    }
-  }
-
-  // ============================================================
-  // GITHUB
-  // ============================================================
+  // --- CHARGEMENT ---
 
   /// Charge tous les protocoles depuis GitHub
   Future<void> loadAllProtocolsFromGitHub() async {
+    _setLoading(true);
     try {
-      // NOUVEAU : Vider la liste avant de la recharger
-      _protocols.clear(); // 👈 LIGNE AJOUTÉE/MODIFIÉE
-
-      // Liste tous les fichiers de protocoles
+      _protocols.clear();
+      
+      // 1. Récupère la liste des noms de fichiers dans le dossier protocoles
       final fileNames = await _gitHub.listProtocols();
-
-      // Charge chaque protocole
+      
+      // 2. Récupère et parse le contenu de chaque fichier
       for (final fileName in fileNames) {
-        final jsonContent = await _gitHub.fetchProtocol(fileName);
-        if (jsonContent != null) {
-          loadProtocolFromJson(jsonContent);
+        final jsonString = await _gitHub.fetchProtocol(fileName);
+        
+        if (jsonString != null && jsonString.isNotEmpty) {
+          try {
+            // Parsing du JSON
+            final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
+            
+            // Conversion en objet Protocol (gère la rétrocompatibilité automatiquement)
+            final protocol = Protocol.fromJson(jsonMap, sourceFileName: fileName);
+            _protocols.add(protocol);
+          } catch (e) {
+             debugPrint("❌ Erreur parsing protocole $fileName: $e");
+          }
         }
       }
+      
+      // Tri alphabétique par titre
+      _protocols.sort((a, b) => a.titre.compareTo(b.titre));
+      notifyListeners();
+      
     } catch (e) {
-      throw Exception('Erreur lors du chargement des protocoles: $e');
+      debugPrint("❌ Erreur globale chargement protocoles: $e");
+      // On ne rethrow pas forcément pour ne pas crasher l'UI, mais on garde la liste vide
+    } finally {
+      _setLoading(false);
     }
   }
 
-  /// Publie un protocole sur GitHub
-  Future<bool> publishProtocolToGitHub(Protocol protocol, String commitMessage) async {
-    try {
-      final jsonContent = protocol.toJsonString();
-      final fileName = protocol.fileName;
+  // --- ACTIONS (SAUVEGARDE / SUPPRESSION) ---
 
+  /// Sauvegarde (Publie) un protocole sur GitHub
+  Future<bool> saveProtocol(Protocol protocol) async {
+    _setLoading(true);
+    try {
+      // 1. Génération du nom de fichier (si nouveau ou renommé)
+      // Note: generateFileName() doit gérer les caractères spéciaux
+      final fileName = protocol.generateFileName();
+      
+      // 2. Mise à jour de la date de modification
+      final protocolToSave = protocol.copyWith(
+        fileName: fileName,
+        dateModification: DateTime.now(),
+      );
+
+      // 3. Conversion en JSON formatté
+      final jsonContent = const JsonEncoder.withIndent('  ').convert(protocolToSave.toJson());
+
+      // 4. Envoi vers GitHub
       final success = await _gitHub.publishProtocol(
         fileName: fileName,
         jsonContent: jsonContent,
-        commitMessage: commitMessage,
+        commitMessage: "Mise à jour protocole: ${protocol.titre}",
       );
 
+      if (success) {
+        // 5. Mise à jour de la liste locale pour refléter les changements sans recharger
+        final index = _protocols.indexWhere((p) => p.fileName == fileName || (p.fileName == null && p.titre == protocol.titre));
+        
+        if (index >= 0) {
+          _protocols[index] = protocolToSave;
+        } else {
+          _protocols.add(protocolToSave);
+        }
+        // Retrier
+        _protocols.sort((a, b) => a.titre.compareTo(b.titre));
+        notifyListeners();
+      }
       return success;
+
     } catch (e) {
-      print('Erreur lors de la publication du protocole: $e');
+      debugPrint("❌ Erreur sauvegarde: $e");
       return false;
+    } finally {
+      _setLoading(false);
     }
   }
 
   /// Supprime un protocole de GitHub
-  Future<bool> deleteProtocolFromGitHub(Protocol protocol, String commitMessage) async {
+  Future<bool> deleteProtocol(Protocol protocol) async {
+    if (protocol.fileName == null) return false; // Ne peut pas supprimer s'il n'est pas sur GitHub
+    
+    _setLoading(true);
     try {
-      final fileName = protocol.fileName;
-
       final success = await _gitHub.deleteProtocol(
-        fileName: fileName,
-        commitMessage: commitMessage,
+        fileName: protocol.fileName!,
+        commitMessage: "Suppression protocole: ${protocol.titre}",
       );
 
+      if (success) {
+        _protocols.removeWhere((p) => p.fileName == protocol.fileName);
+        notifyListeners();
+      }
       return success;
     } catch (e) {
-      print('Erreur lors de la suppression du protocole: $e');
+      debugPrint("❌ Erreur suppression: $e");
       return false;
+    } finally {
+      _setLoading(false);
     }
+  }
+
+  // --- UTILITAIRES DE GESTION (VENANT DE L'ANCIEN EDITOR SERVICE) ---
+
+  Protocol createNewProtocol() {
+    return Protocol(
+      titre: 'Nouveau protocole',
+      description: '',
+      auteur: '',
+      version: '1.0',
+      dateModification: DateTime.now(),
+      blocs: [],
+    );
+  }
+
+  Protocol duplicateProtocol(Protocol original) {
+    // Crée une copie en mémoire. Elle ne sera sauvegardée (et n'aura un fileName) que lors du "Save"
+    return Protocol(
+      titre: '${original.titre} (copie)',
+      description: original.description,
+      auteur: original.auteur,
+      version: '1.0',
+      dateModification: DateTime.now(),
+      // On duplique aussi les blocs pour éviter les références partagées
+      blocs: original.blocs.map((b) {
+        // Astuce: passer par JSON permet une copie profonde (deep copy) facile
+        final json = b.toJson();
+        json.remove('id'); // On retire l'ID pour en générer un nouveau si besoin
+        return ProtocolBlock.fromJson(json);
+      }).toList(),
+      fileName: null, 
+    );
+  }
+
+  void _setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners(); // Notifie l'UI pour afficher/masquer les spinners
   }
 }

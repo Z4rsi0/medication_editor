@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/medication_provider.dart';
 import '../services/protocol_provider.dart';
+// Imports des écrans
 import 'medication_list_screen.dart';
-import 'general_info_screen.dart';
-import 'protocol_list_screen.dart';
-import 'protocol_general_info_screen.dart';
+import 'general_info_screen.dart'; 
+// NOUVEAU : Ce fichier contient maintenant la classe ProtocolListScreen ET ProtocolEditorScreen
+import 'protocol_editor_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,7 +21,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDataFromGitHub();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDataFromGitHub();
+    });
   }
 
   Future<void> _loadDataFromGitHub() async {
@@ -31,31 +34,35 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // Charger les médicaments
-      if (!mounted) return;
-      await Provider.of<MedicationProvider>(context, listen: false)
-          .loadFromGitHub();
+      // 1. Charger les médicaments
+      if (mounted) {
+        await Provider.of<MedicationProvider>(context, listen: false).loadFromGitHub();
+      }
       
-      // Charger les protocoles
-      if (!mounted) return;
-      await Provider.of<ProtocolProvider>(context, listen: false)
-          .loadAllProtocolsFromGitHub();
+      // 2. Charger les protocoles
+      if (mounted) {
+        await Provider.of<ProtocolProvider>(context, listen: false).loadAllProtocolsFromGitHub();
+      }
       
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Données chargées depuis GitHub'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Données chargées depuis GitHub'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Note: $e'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -67,50 +74,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Éditeur Médical'),
-          backgroundColor: Colors.teal,
-        ),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Chargement des données depuis GitHub...'),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Éditeur Médical'),
         backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadDataFromGitHub,
+            icon: _isLoading 
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : const Icon(Icons.refresh),
+            onPressed: _isLoading ? null : _loadDataFromGitHub,
             tooltip: 'Recharger depuis GitHub',
           ),
         ],
       ),
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // En-tête
               Icon(
                 Icons.medical_services,
-                size: 100,
+                size: 80,
                 color: Colors.teal.shade300,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               const Text(
                 'Éditeur Médical',
                 style: TextStyle(
@@ -129,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 48),
 
-              // Section Médicaments
+              // Section Médicaments (Inchangée)
               Card(
                 elevation: 4,
                 child: Padding(
@@ -182,14 +172,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () {
-                                Provider.of<MedicationProvider>(context,
-                                        listen: false)
+                                Provider.of<MedicationProvider>(context, listen: false)
                                     .startNewMedication();
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        const GeneralInfoScreen(),
+                                    builder: (context) => const GeneralInfoScreen(),
                                   ),
                                 );
                               },
@@ -198,8 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.teal,
                                 foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
                             ),
                           ),
@@ -210,8 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        const MedicationListScreen(),
+                                    builder: (context) => const MedicationListScreen(),
                                   ),
                                 );
                               },
@@ -219,10 +205,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               label: const Text('Liste'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.teal,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                side: const BorderSide(
-                                    color: Colors.teal, width: 2),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                side: const BorderSide(color: Colors.teal, width: 2),
                               ),
                             ),
                           ),
@@ -234,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Section Protocoles
+              // Section Protocoles (Nouveau système)
               Card(
                 elevation: 4,
                 child: Padding(
@@ -261,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'Créer et gérer les protocoles cliniques',
+                                  'Nouveau système par blocs',
                                   style: TextStyle(color: Colors.grey),
                                 ),
                               ],
@@ -287,14 +271,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () {
-                                Provider.of<ProtocolProvider>(context,
-                                        listen: false)
-                                    .startNewProtocol();
+                                // CORRECTION : Utilisation de createNewProtocol
+                                final provider = Provider.of<ProtocolProvider>(context, listen: false);
+                                final newProtocol = provider.createNewProtocol();
+                                
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        const ProtocolGeneralInfoScreen(),
+                                    builder: (context) => ProtocolEditorScreen(protocol: newProtocol),
                                   ),
                                 );
                               },
@@ -303,8 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
                                 foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
                             ),
                           ),
@@ -312,11 +295,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: () {
+                                // CORRECTION : Pointe vers ProtocolListScreen qui est dans protocol_editor_screen.dart
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        const ProtocolListScreen(),
+                                    builder: (context) => const ProtocolListScreen(),
                                   ),
                                 );
                               },
@@ -324,10 +307,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               label: const Text('Liste'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.blue,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                side: const BorderSide(
-                                    color: Colors.blue, width: 2),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                side: const BorderSide(color: Colors.blue, width: 2),
                               ),
                             ),
                           ),

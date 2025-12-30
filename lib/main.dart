@@ -1,7 +1,21 @@
 import 'package:flutter/material.dart';
-import 'screens/protocol_editor_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/home_screen.dart';
+import 'services/medication_provider.dart';
+import 'services/protocol_provider.dart';
+import 'services/github_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await dotenv.load(fileName: ".env");
+    await GitHubService().initialize();
+  } catch (e) {
+    debugPrint("⚠️ Erreur d'initialisation (.env ou GitHub): $e");
+  }
+
   runApp(const MedicationEditorApp());
 }
 
@@ -10,79 +24,29 @@ class MedicationEditorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Medication Editor',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
-      home: const MainScreen(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
-
-  @override
-  State<MainScreen> createState() => _MainScreenState();
-}
-
-class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
-
-  final List<Widget> _pages = [
-    const _MedicamentsPlaceholder(), // À remplacer par l'écran existant
-    const ProtocolListScreen(),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.medication_outlined),
-            selectedIcon: Icon(Icons.medication),
-            label: 'Médicaments',
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => MedicationProvider()),
+        ChangeNotifierProvider(create: (_) => ProtocolProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Éditeur Médical',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.teal,
+            brightness: Brightness.light,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.description_outlined),
-            selectedIcon: Icon(Icons.description),
-            label: 'Protocoles',
+          useMaterial3: true,
+          // J'ai retiré cardTheme pour corriger ton erreur de compilation spécifique.
+          // Le style par défaut s'appliquera.
+          inputDecorationTheme: InputDecorationTheme(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            filled: true,
+            fillColor: Colors.grey.shade50,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Placeholder pour l'écran des médicaments existant
-class _MedicamentsPlaceholder extends StatelessWidget {
-  const _MedicamentsPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Médicaments'),
-      ),
-      body: const Center(
-        child: Text(
-          'Écran des médicaments existant\n(À intégrer)',
-          textAlign: TextAlign.center,
         ),
+        home: const HomeScreen(),
       ),
     );
   }
