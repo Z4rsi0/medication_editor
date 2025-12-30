@@ -17,43 +17,43 @@ class BlockTypeSelectorDialog extends StatelessWidget {
         child: ListView(
           shrinkWrap: true,
           children: [
-            _BlockTypeOption(
+            const _BlockTypeOption(
               icon: Icons.folder_open,
               label: 'Section',
               description: 'Conteneur pliable avec sous-blocs',
               type: BlockType.section,
             ),
-            _BlockTypeOption(
+            const _BlockTypeOption(
               icon: Icons.text_fields,
               label: 'Texte',
               description: 'Texte formaté (gras, italique...)',
               type: BlockType.texte,
             ),
-            _BlockTypeOption(
+            const _BlockTypeOption(
               icon: Icons.table_chart,
               label: 'Tableau',
               description: 'Tableau de données',
               type: BlockType.tableau,
             ),
-            _BlockTypeOption(
+            const _BlockTypeOption(
               icon: Icons.image,
               label: 'Image',
               description: 'Image (fichier ou URL)',
               type: BlockType.image,
             ),
-            _BlockTypeOption(
+            const _BlockTypeOption(
               icon: Icons.medication,
               label: 'Médicament',
               description: 'Référence avec calcul de dose',
               type: BlockType.medicament,
             ),
-            _BlockTypeOption(
+            const _BlockTypeOption(
               icon: Icons.calculate,
               label: 'Formulaire / Score',
               description: 'Calcul interactif de score clinique',
               type: BlockType.formulaire,
             ),
-            _BlockTypeOption(
+            const _BlockTypeOption(
               icon: Icons.warning,
               label: 'Alerte',
               description: 'Message d\'avertissement',
@@ -145,7 +145,7 @@ class BlockEditorWidget extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.drag_handle, size: 20, color: Colors.grey),
+                const Icon(Icons.drag_handle, size: 20, color: Colors.grey),
                 const SizedBox(width: 4),
                 Icon(_getBlockIcon(block.type), size: 20, color: _getBlockColor(block.type)),
                 const SizedBox(width: 8),

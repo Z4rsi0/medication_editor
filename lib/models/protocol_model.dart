@@ -1,6 +1,3 @@
-/// Modèle de protocole avec architecture flexible par blocs
-/// Utilisé par medication_editor pour l'édition des protocoles
-
 // Types de blocs disponibles
 enum BlockType {
   section,      // Tuile collapsible
@@ -254,9 +251,9 @@ class SectionBlock extends ProtocolBlock {
     this.temps,
     this.initialementOuvert = false,
     required this.contenu,
-    required int ordre,
-    String? id,
-  }) : super(type: BlockType.section, ordre: ordre, id: id);
+    required super.ordre,
+    super.id,
+  }) : super(type: BlockType.section);
 
   factory SectionBlock.fromJson(Map<String, dynamic> json) {
     return SectionBlock(
@@ -377,9 +374,9 @@ class TexteBlock extends ProtocolBlock {
   TexteBlock({
     required this.contenu,
     this.format,
-    required int ordre,
-    String? id,
-  }) : super(type: BlockType.texte, ordre: ordre, id: id);
+    required super.ordre,
+    super.id,
+  }) : super(type: BlockType.texte);
 
   factory TexteBlock.fromJson(Map<String, dynamic> json) {
     return TexteBlock(
@@ -440,9 +437,9 @@ class TableauBlock extends ProtocolBlock {
     required this.colonnes,
     required this.lignes,
     this.avecEntete = true,
-    required int ordre,
-    String? id,
-  }) : super(type: BlockType.tableau, ordre: ordre, id: id);
+    required super.ordre,
+    super.id,
+  }) : super(type: BlockType.tableau);
 
   factory TableauBlock.fromJson(Map<String, dynamic> json) {
     return TableauBlock(
@@ -513,9 +510,9 @@ class ImageBlock extends ProtocolBlock {
     this.estBase64 = false,
     this.legende,
     this.largeurPourcent,
-    required int ordre,
-    String? id,
-  }) : super(type: BlockType.image, ordre: ordre, id: id);
+    required super.ordre,
+    super.id,
+  }) : super(type: BlockType.image);
 
   factory ImageBlock.fromJson(Map<String, dynamic> json) {
     return ImageBlock(
@@ -584,9 +581,9 @@ class MedicamentBlock extends ProtocolBlock {
     this.indication,
     this.voie,
     this.commentaire,
-    required int ordre,
-    String? id,
-  }) : super(type: BlockType.medicament, ordre: ordre, id: id);
+    required super.ordre,
+    super.id,
+  }) : super(type: BlockType.medicament);
 
   factory MedicamentBlock.fromJson(Map<String, dynamic> json) {
     return MedicamentBlock(
@@ -826,9 +823,9 @@ class FormulaireBlock extends ProtocolBlock {
     required this.champs,
     this.formuleCalcul,
     this.interpretations,
-    required int ordre,
-    String? id,
-  }) : super(type: BlockType.formulaire, ordre: ordre, id: id);
+    required super.ordre,
+    super.id,
+  }) : super(type: BlockType.formulaire);
 
   factory FormulaireBlock.fromJson(Map<String, dynamic> json) {
     return FormulaireBlock(
@@ -903,9 +900,9 @@ class AlerteBlock extends ProtocolBlock {
   AlerteBlock({
     required this.contenu,
     this.niveau = AlerteNiveau.info,
-    required int ordre,
-    String? id,
-  }) : super(type: BlockType.alerte, ordre: ordre, id: id);
+    required super.ordre,
+    super.id,
+  }) : super(type: BlockType.alerte);
 
   factory AlerteBlock.fromJson(Map<String, dynamic> json) {
     return AlerteBlock(

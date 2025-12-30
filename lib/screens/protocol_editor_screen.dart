@@ -364,6 +364,7 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
