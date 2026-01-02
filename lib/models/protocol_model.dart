@@ -569,18 +569,120 @@ class ImageBlock extends ProtocolBlock {
   }
 }
 
-/// Bloc référence médicament
+/// Condition de poids/âge pour un médicament
+class MedicamentCondition {
+  final num? poidsMin;
+  final num? poidsMax;
+  final num? ageMinMois;
+  final num? ageMaxMois;
+
+  MedicamentCondition({
+    this.poidsMin,
+    this.poidsMax,
+    this.ageMinMois,
+    this.ageMaxMois,
+  });
+
+  factory MedicamentCondition.fromJson(Map<String, dynamic> json) {
+    return MedicamentCondition(
+      poidsMin: json['poidsMin'] as num?,
+      poidsMax: json['poidsMax'] as num?,
+      ageMinMois: json['ageMinMois'] as num?,
+      ageMaxMois: json['ageMaxMois'] as num?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (poidsMin != null) 'poidsMin': poidsMin,
+      if (poidsMax != null) 'poidsMax': poidsMax,
+      if (ageMinMois != null) 'ageMinMois': ageMinMois,
+      if (ageMaxMois != null) 'ageMaxMois': ageMaxMois,
+    };
+  }
+
+  MedicamentCondition copyWith({
+    num? poidsMin,
+    num? poidsMax,
+    num? ageMinMois,
+    num? ageMaxMois,
+  }) {
+    return MedicamentCondition(
+      poidsMin: poidsMin ?? this.poidsMin,
+      poidsMax: poidsMax ?? this.poidsMax,
+      ageMinMois: ageMinMois ?? this.ageMinMois,
+      ageMaxMois: ageMaxMois ?? this.ageMaxMois,
+    );
+  }
+
+  /// Vérifie si la condition est remplie pour un poids donné
+  bool matchesPoids(num poids) {
+    if (poidsMin != null && poids < poidsMin!) return false;
+    if (poidsMax != null && poids > poidsMax!) return false;
+    return true;
+  }
+
+  /// Vérifie si la condition est remplie pour un âge donné (en mois)
+  bool matchesAge(num ageMois) {
+    if (ageMinMois != null && ageMois < ageMinMois!) return false;
+    if (ageMaxMois != null && ageMois > ageMaxMois!) return false;
+    return true;
+  }
+
+  /// Description lisible de la condition
+  String get description {
+    final parts = <String>[];
+    
+    if (poidsMin != null || poidsMax != null) {
+      if (poidsMin != null && poidsMax != null) {
+        parts.add('Poids: $poidsMin - $poidsMax kg');
+      } else if (poidsMin != null) {
+        parts.add('Poids ≥ $poidsMin kg');
+      } else {
+        parts.add('Poids ≤ $poidsMax kg');
+      }
+    }
+    
+    if (ageMinMois != null || ageMaxMois != null) {
+      if (ageMinMois != null && ageMaxMois != null) {
+        parts.add('Âge: ${_formatAge(ageMinMois!)} - ${_formatAge(ageMaxMois!)}');
+      } else if (ageMinMois != null) {
+        parts.add('Âge ≥ ${_formatAge(ageMinMois!)}');
+      } else {
+        parts.add('Âge ≤ ${_formatAge(ageMaxMois!)}');
+      }
+    }
+    
+    return parts.isEmpty ? 'Tous patients' : parts.join(', ');
+  }
+
+  String _formatAge(num mois) {
+    if (mois < 12) return '$mois mois';
+    final annees = mois ~/ 12;
+    final moisRestants = mois % 12;
+    if (moisRestants == 0) return '$annees ans';
+    return '$annees ans $moisRestants mois';
+  }
+
+  bool get isEmpty => 
+      poidsMin == null && poidsMax == null && 
+      ageMinMois == null && ageMaxMois == null;
+}
+
+/// Bloc référence médicament avec condition optionnelle
 class MedicamentBlock extends ProtocolBlock {
   final String nomMedicament;
   final String? indication;
   final String? voie;
   final String? commentaire;
+  final MedicamentCondition? condition; // NOUVEAU: condition de poids/âge
 
   MedicamentBlock({
     required this.nomMedicament,
     this.indication,
     this.voie,
     this.commentaire,
+    this.condition,
     required super.ordre,
     super.id,
   }) : super(type: BlockType.medicament);
@@ -591,6 +693,9 @@ class MedicamentBlock extends ProtocolBlock {
       indication: json['indication'],
       voie: json['voie'],
       commentaire: json['commentaire'],
+      condition: json['condition'] != null 
+          ? MedicamentCondition.fromJson(json['condition'])
+          : null,
       ordre: json['ordre'] ?? 0,
       id: json['id'],
     );
@@ -604,6 +709,7 @@ class MedicamentBlock extends ProtocolBlock {
       if (indication != null) 'indication': indication,
       if (voie != null) 'voie': voie,
       if (commentaire != null) 'commentaire': commentaire,
+      if (condition != null && !condition!.isEmpty) 'condition': condition!.toJson(),
       'ordre': ordre,
       if (id != null) 'id': id,
     };
@@ -616,6 +722,7 @@ class MedicamentBlock extends ProtocolBlock {
       indication: indication,
       voie: voie,
       commentaire: commentaire,
+      condition: condition,
       ordre: newOrdre,
       id: id,
     );
@@ -626,6 +733,7 @@ class MedicamentBlock extends ProtocolBlock {
     String? indication,
     String? voie,
     String? commentaire,
+    MedicamentCondition? condition,
     int? ordre,
     String? id,
   }) {
@@ -634,9 +742,17 @@ class MedicamentBlock extends ProtocolBlock {
       indication: indication ?? this.indication,
       voie: voie ?? this.voie,
       commentaire: commentaire ?? this.commentaire,
+      condition: condition ?? this.condition,
       ordre: ordre ?? this.ordre,
       id: id ?? this.id,
     );
+  }
+
+  /// Vérifie si ce médicament doit être affiché pour un poids donné
+  bool shouldShowForWeight(num? poids) {
+    if (condition == null || condition!.isEmpty) return true;
+    if (poids == null) return true; // Afficher si pas de poids spécifié
+    return condition!.matchesPoids(poids);
   }
 }
 

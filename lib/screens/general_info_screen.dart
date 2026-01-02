@@ -16,6 +16,7 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
   final _nomController = TextEditingController();
   final _nomCommercialController = TextEditingController();
   final _galeniqueController = TextEditingController();
+  final _galeniqueFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -34,6 +35,7 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
     _nomController.dispose();
     _nomCommercialController.dispose();
     _galeniqueController.dispose();
+    _galeniqueFocusNode.dispose();
     super.dispose();
   }
 
@@ -48,9 +50,7 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
 
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const IndicationsScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const IndicationsScreen()),
       );
     }
   }
@@ -67,20 +67,10 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            const Text(
-              'Étape 1/5',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: 0.2,
-              backgroundColor: Colors.grey[300],
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.teal),
-            ),
+            const _StepProgress(),
             const SizedBox(height: 24),
+            
+            // Nom DCI
             TextFormField(
               controller: _nomController,
               decoration: const InputDecoration(
@@ -90,14 +80,11 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
                 prefixIcon: Icon(Icons.medication),
               ),
               textCapitalization: TextCapitalization.words,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Le nom est obligatoire';
-                }
-                return null;
-              },
+              validator: (value) => (value == null || value.trim().isEmpty) ? 'Requis' : null,
             ),
             const SizedBox(height: 16),
+            
+            // Nom Commercial
             TextFormField(
               controller: _nomCommercialController,
               decoration: const InputDecoration(
@@ -109,91 +96,71 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
               textCapitalization: TextCapitalization.characters,
             ),
             const SizedBox(height: 16),
-            Autocomplete<String>(
-              initialValue: TextEditingValue(text: _galeniqueController.text),
+
+            // Autocomplete Galénique Optimisé
+            RawAutocomplete<String>(
+              textEditingController: _galeniqueController,
+              focusNode: _galeniqueFocusNode,
               optionsBuilder: (TextEditingValue textEditingValue) {
                 if (textEditingValue.text.isEmpty) {
                   return const Iterable<String>.empty();
                 }
                 return MedicationConstants.galeniques.where((String option) {
-                  return option
-                      .toLowerCase()
-                      .contains(textEditingValue.text.toLowerCase());
+                  return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
                 });
               },
               onSelected: (String selection) {
                 _galeniqueController.text = selection;
               },
-              fieldViewBuilder: (BuildContext context,
-                  TextEditingController fieldTextEditingController,
-                  FocusNode fieldFocusNode,
-                  VoidCallback onFieldSubmitted) {
-                // Synchroniser avec notre controller
-                if (fieldTextEditingController.text != _galeniqueController.text) {
-                  fieldTextEditingController.text = _galeniqueController.text;
-                }
-                
-                // Écouter les changements
-                fieldTextEditingController.addListener(() {
-                  _galeniqueController.text = fieldTextEditingController.text;
-                });
-
+              fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
                 return TextFormField(
-                  controller: fieldTextEditingController,
-                  focusNode: fieldFocusNode,
+                  controller: controller,
+                  focusNode: focusNode,
                   decoration: const InputDecoration(
                     labelText: 'Forme galénique *',
-                    hintText: 'Ex: Solution perfusion 10 mg/mL',
+                    hintText: 'Ex: Solution perfusion',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.science),
                     helperText: 'Tapez pour voir les suggestions',
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'La forme galénique est obligatoire';
-                    }
-                    return null;
-                  },
+                  validator: (value) => (value == null || value.trim().isEmpty) ? 'Requis' : null,
+                );
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(8),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: options.length,
+                        itemBuilder: (context, index) {
+                          final option = options.elementAt(index);
+                          return ListTile(
+                            title: Text(option),
+                            dense: true,
+                            onTap: () => onSelected(option),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 );
               },
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Suggestions disponibles ou saisissez votre propre galénique',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
+            
             const SizedBox(height: 32),
+            
+            // Boutons d'action
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Annuler ?'),
-                          content: const Text(
-                            'Voulez-vous vraiment annuler la création de ce médicament ?',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Non'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Provider.of<MedicationProvider>(context,
-                                        listen: false)
-                                    .cancelCurrentMedication();
-                                Navigator.pop(context);
-                                Navigator.pop(context);
-                              },
-                              child: const Text('Oui'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                    onPressed: () => _confirmCancel(context),
                     child: const Text('Annuler'),
                   ),
                 ),
@@ -215,6 +182,47 @@ class _GeneralInfoScreenState extends State<GeneralInfoScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _confirmCancel(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Annuler ?'),
+        content: const Text('Voulez-vous vraiment annuler la création ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Non')),
+          TextButton(
+            onPressed: () {
+              Provider.of<MedicationProvider>(context, listen: false).cancelCurrentMedication();
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Exit screen
+            },
+            child: const Text('Oui'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepProgress extends StatelessWidget {
+  const _StepProgress();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Étape 1/5', style: TextStyle(fontSize: 14, color: Colors.grey)),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(
+          value: 0.2,
+          backgroundColor: Colors.grey[300],
+          valueColor: const AlwaysStoppedAnimation<Color>(Colors.teal),
+        ),
+      ],
     );
   }
 }

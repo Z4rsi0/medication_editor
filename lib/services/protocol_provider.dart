@@ -1,79 +1,88 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import '../models/protocol_model.dart'; // Le NOUVEAU modèle
+import 'package:flutter/foundation.dart'; // Pour compute
+import '../models/protocol_model.dart';
 import 'github_service.dart';
+
+// --- FONCTIONS TOP-LEVEL POUR COMPUTE ---
+
+String _encodeProtocol(Protocol protocol) {
+  return const JsonEncoder.withIndent('  ').convert(protocol.toJson());
+}
+
+// Fonction isolée pour parser une liste entière de protocoles
+List<Protocol> _parseProtocolList(List<Map<String, String?>> rawDataList) {
+  final List<Protocol> results = [];
+  
+  for (final item in rawDataList) {
+    final content = item['content'];
+    final fileName = item['fileName'];
+    
+    if (content != null && content.isNotEmpty) {
+      try {
+        final jsonMap = jsonDecode(content);
+        results.add(Protocol.fromJson(jsonMap, sourceFileName: fileName));
+      } catch (e) {
+        debugPrint("Erreur parsing $fileName dans isolate: $e");
+      }
+    }
+  }
+  return results;
+}
+
+// ----------------------------------------
 
 class ProtocolProvider extends ChangeNotifier {
   final GitHubService _gitHub = GitHubService();
   
-  // Liste des protocoles chargée depuis GitHub
-  List<Protocol> _protocols = [];
+  final List<Protocol> _protocols = [];
   List<Protocol> get protocols => List.unmodifiable(_protocols);
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  // --- CHARGEMENT ---
-
-  /// Charge tous les protocoles depuis GitHub
   Future<void> loadAllProtocolsFromGitHub() async {
+    if (_isLoading) return;
     _setLoading(true);
+    
     try {
       _protocols.clear();
-      
-      // 1. Récupère la liste des noms de fichiers dans le dossier protocoles
       final fileNames = await _gitHub.listProtocols();
       
-      // 2. Récupère et parse le contenu de chaque fichier
-      for (final fileName in fileNames) {
-        final jsonString = await _gitHub.fetchProtocol(fileName);
-        
-        if (jsonString != null && jsonString.isNotEmpty) {
-          try {
-            // Parsing du JSON
-            final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
-            
-            // Conversion en objet Protocol (gère la rétrocompatibilité automatiquement)
-            final protocol = Protocol.fromJson(jsonMap, sourceFileName: fileName);
-            _protocols.add(protocol);
-          } catch (e) {
-             debugPrint("❌ Erreur parsing protocole $fileName: $e");
-          }
-        }
+      // Récupération parallèle de tous les contenus bruts
+      final futures = fileNames.map((fileName) async {
+        final content = await _gitHub.fetchProtocol(fileName);
+        return {'fileName': fileName, 'content': content};
+      });
+      
+      final results = await Future.wait(futures);
+      
+      // Parsing lourd dans un Isolate unique pour ne pas bloquer l'UI
+      if (results.isNotEmpty) {
+        final loadedProtocols = await compute(_parseProtocolList, results);
+        _protocols.addAll(loadedProtocols);
+        _protocols.sort((a, b) => a.titre.compareTo(b.titre));
       }
       
-      // Tri alphabétique par titre
-      _protocols.sort((a, b) => a.titre.compareTo(b.titre));
       notifyListeners();
-      
     } catch (e) {
       debugPrint("❌ Erreur globale chargement protocoles: $e");
-      // On ne rethrow pas forcément pour ne pas crasher l'UI, mais on garde la liste vide
     } finally {
       _setLoading(false);
     }
   }
 
-  // --- ACTIONS (SAUVEGARDE / SUPPRESSION) ---
-
-  /// Sauvegarde (Publie) un protocole sur GitHub
   Future<bool> saveProtocol(Protocol protocol) async {
     _setLoading(true);
     try {
-      // 1. Génération du nom de fichier (si nouveau ou renommé)
-      // Note: generateFileName() doit gérer les caractères spéciaux
       final fileName = protocol.generateFileName();
-      
-      // 2. Mise à jour de la date de modification
       final protocolToSave = protocol.copyWith(
         fileName: fileName,
         dateModification: DateTime.now(),
       );
 
-      // 3. Conversion en JSON formatté
-      final jsonContent = const JsonEncoder.withIndent('  ').convert(protocolToSave.toJson());
+      // Encodage JSON en background
+      final jsonContent = await compute(_encodeProtocol, protocolToSave);
 
-      // 4. Envoi vers GitHub
       final success = await _gitHub.publishProtocol(
         fileName: fileName,
         jsonContent: jsonContent,
@@ -81,20 +90,16 @@ class ProtocolProvider extends ChangeNotifier {
       );
 
       if (success) {
-        // 5. Mise à jour de la liste locale pour refléter les changements sans recharger
         final index = _protocols.indexWhere((p) => p.fileName == fileName || (p.fileName == null && p.titre == protocol.titre));
-        
         if (index >= 0) {
           _protocols[index] = protocolToSave;
         } else {
           _protocols.add(protocolToSave);
         }
-        // Retrier
         _protocols.sort((a, b) => a.titre.compareTo(b.titre));
         notifyListeners();
       }
       return success;
-
     } catch (e) {
       debugPrint("❌ Erreur sauvegarde: $e");
       return false;
@@ -103,10 +108,8 @@ class ProtocolProvider extends ChangeNotifier {
     }
   }
 
-  /// Supprime un protocole de GitHub
   Future<bool> deleteProtocol(Protocol protocol) async {
-    if (protocol.fileName == null) return false; // Ne peut pas supprimer s'il n'est pas sur GitHub
-    
+    if (protocol.fileName == null) return false;
     _setLoading(true);
     try {
       final success = await _gitHub.deleteProtocol(
@@ -127,13 +130,9 @@ class ProtocolProvider extends ChangeNotifier {
     }
   }
 
-  // --- UTILITAIRES DE GESTION (VENANT DE L'ANCIEN EDITOR SERVICE) ---
-
   Protocol createNewProtocol() {
     return Protocol(
       titre: 'Nouveau protocole',
-      description: '',
-      auteur: '',
       version: '1.0',
       dateModification: DateTime.now(),
       blocs: [],
@@ -141,26 +140,18 @@ class ProtocolProvider extends ChangeNotifier {
   }
 
   Protocol duplicateProtocol(Protocol original) {
-    // Crée une copie en mémoire. Elle ne sera sauvegardée (et n'aura un fileName) que lors du "Save"
-    return Protocol(
+    // Clonage via JSON pour éviter les références (Deep Copy)
+    final json = original.toJson();
+    final copy = Protocol.fromJson(json);
+    return copy.copyWith(
       titre: '${original.titre} (copie)',
-      description: original.description,
-      auteur: original.auteur,
-      version: '1.0',
+      fileName: null, // Nouveau fichier
       dateModification: DateTime.now(),
-      // On duplique aussi les blocs pour éviter les références partagées
-      blocs: original.blocs.map((b) {
-        // Astuce: passer par JSON permet une copie profonde (deep copy) facile
-        final json = b.toJson();
-        json.remove('id'); // On retire l'ID pour en générer un nouveau si besoin
-        return ProtocolBlock.fromJson(json);
-      }).toList(),
-      fileName: null, 
     );
   }
 
   void _setLoading(bool value) {
     _isLoading = value;
-    notifyListeners(); // Notifie l'UI pour afficher/masquer les spinners
+    notifyListeners();
   }
 }

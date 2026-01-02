@@ -1,6 +1,4 @@
-// posology_form_dialog.dart
-
-// ignore_for_file: deprecated_member_use, unnecessary_const, unnecessary_to_list_in_spreads
+// ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,10 +6,9 @@ import 'package:provider/provider.dart';
 import '../services/medication_provider.dart';
 import '../models/medication.dart';
 import '../utils/constants.dart';
-
-// ====================================================================
-// WIDGET PRINCIPAL
-// ====================================================================
+// Imports des nouveaux sous-composants
+import 'posology/dose_input.dart';
+import 'posology/tranche_editor.dart';
 
 class PosologyFormDialog extends StatefulWidget {
   final int? index;
@@ -21,36 +18,36 @@ class PosologyFormDialog extends StatefulWidget {
   State<PosologyFormDialog> createState() => _PosologyFormDialogState();
 }
 
-// ====================================================================
-// ÉTAT DU WIDGET PRINCIPAL
-// ====================================================================
-
 class _PosologyFormDialogState extends State<PosologyFormDialog> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
+  // Controllers principaux
   final _voieController = TextEditingController();
   final _preparationController = TextEditingController();
   final _dosesController = TextEditingController();
+  final _doseMaxController = TextEditingController();
 
-  // Dose simple
+  // Controllers pour dose simple (hors tranches)
   final _doseKgController = TextEditingController();
   final _doseKgMinController = TextEditingController();
   final _doseKgMaxController = TextEditingController();
-  final _doseMaxController = TextEditingController();
 
-  // Variables
+  // État
   String? _selectedUnite;
   bool _useDoseRange = false;
   bool _useTranches = false;
   bool _useComplexScheme = false;
 
-  // Tranches
-  List<TrancheData> _tranches = [];
+  // Liste des tranches (ViewModel)
+  final List<TrancheData> _tranches = [];
 
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  void _loadInitialData() {
     final provider = Provider.of<MedicationProvider>(context, listen: false);
     final posology = widget.index != null
         ? provider.currentIndication!.posologies[widget.index!]
@@ -67,9 +64,9 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
         _dosesController.text = posology.doses!;
       } else if (posology.tranches != null && posology.tranches!.isNotEmpty) {
         _useTranches = true;
-        _tranches = posology.tranches!
-            .map((t) => TrancheData.fromTranche(t))
-            .toList();
+        for (var t in posology.tranches!) {
+          _tranches.add(TrancheData.fromTranche(t));
+        }
       } else if (posology.doseKgMin != null) {
         _useDoseRange = true;
         _doseKgMinController.text = posology.doseKgMin.toString();
@@ -85,729 +82,246 @@ class _PosologyFormDialogState extends State<PosologyFormDialog> {
     _voieController.dispose();
     _preparationController.dispose();
     _dosesController.dispose();
+    _doseMaxController.dispose();
     _doseKgController.dispose();
     _doseKgMinController.dispose();
     _doseKgMaxController.dispose();
-    _doseMaxController.dispose();
-    for (var tranche in _tranches) {
-      tranche.dispose();
-    }
+    for (var t in _tranches) t.dispose();
     super.dispose();
   }
 
-  // Helper pour parser les nombres
   dynamic _parseNumber(String text) {
     if (text.isEmpty) return null;
     return double.tryParse(text) ?? int.tryParse(text);
   }
 
   void _savePosology() {
-    if (_formKey.currentState!.validate()) {
-      if (_useTranches && _tranches.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Veuillez ajouter au moins une tranche.')),
-        );
+    if (!_formKey.currentState!.validate()) return;
+
+    // Validation spécifique Tranches
+    if (_useTranches) {
+      if (_tranches.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ajoutez au moins une tranche.')));
         return;
       }
-
-      // Validation pour les tranches
-      if (_useTranches) {
-        bool allTranchesHaveDose = _tranches.every((tranche) {
-          if (tranche.useComplexScheme) {
-            return tranche.dosesController.text.trim().isNotEmpty;
-          }
-          if (tranche.useDoseRange) {
-            return tranche.doseKgMinController.text.trim().isNotEmpty &&
-                tranche.doseKgMaxController.text.trim().isNotEmpty;
-          }
-          return tranche.doseKgController.text.trim().isNotEmpty;
-        });
-
-        if (!allTranchesHaveDose) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content:
-                    Text('Veuillez spécifier un dosage pour chaque tranche.')),
-          );
-          return;
-        }
-      }
-
-      final bool isComplexOrTranchesUsed = _useComplexScheme || _useTranches;
-
-      final posology = Posology(
-        voie: _voieController.text.trim(),
-        unite: _selectedUnite!,
-        preparation: _preparationController.text.trim().isEmpty
-            ? null
-            : _preparationController.text.trim(),
-        doseMax: _parseNumber(_doseMaxController.text),
-        doses: _useComplexScheme ? _dosesController.text.trim() : null,
-        tranches: _useTranches
-            ? _tranches.map((td) => td.toTranche()).toList()
-            : null,
-        doseKg: !isComplexOrTranchesUsed && !_useDoseRange
-            ? _parseNumber(_doseKgController.text)
-            : null,
-        doseKgMin: !isComplexOrTranchesUsed && _useDoseRange
-            ? _parseNumber(_doseKgMinController.text)
-            : null,
-        doseKgMax: !isComplexOrTranchesUsed && _useDoseRange
-            ? _parseNumber(_doseKgMaxController.text)
-            : null,
-      );
-
-      final provider = Provider.of<MedicationProvider>(context, listen: false);
-      if (widget.index == null) {
-        provider.addPosology(posology);
-      } else {
-        provider.updatePosology(widget.index!, posology);
-      }
-
-      Navigator.pop(context);
+      // Vérifier que chaque tranche a au moins une info
+      // (La validation fine est faite par les FormFields, mais on peut ajouter une sécurité ici)
     }
+
+    final posology = Posology(
+      voie: _voieController.text.trim(),
+      unite: _selectedUnite!,
+      preparation: _preparationController.text.trim().isEmpty ? null : _preparationController.text.trim(),
+      doseMax: _parseNumber(_doseMaxController.text),
+      doses: _useComplexScheme ? _dosesController.text.trim() : null,
+      tranches: _useTranches ? _tranches.map((td) => td.toTranche()).toList() : null,
+      doseKg: (!_useComplexScheme && !_useTranches && !_useDoseRange) ? _parseNumber(_doseKgController.text) : null,
+      doseKgMin: (!_useComplexScheme && !_useTranches && _useDoseRange) ? _parseNumber(_doseKgMinController.text) : null,
+      doseKgMax: (!_useComplexScheme && !_useTranches && _useDoseRange) ? _parseNumber(_doseKgMaxController.text) : null,
+    );
+
+    final provider = Provider.of<MedicationProvider>(context, listen: false);
+    if (widget.index == null) {
+      provider.addPosology(posology);
+    } else {
+      provider.updatePosology(widget.index!, posology);
+    }
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: Text(widget.index == null
-          ? 'Ajouter une Posologie'
-          : 'Modifier la Posologie'),
+      title: Text(widget.index == null ? 'Ajouter une Posologie' : 'Modifier la Posologie'),
       content: Form(
         key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Voie d'administration avec Autocomplete
-            Autocomplete<String>(
-              initialValue: TextEditingValue(text: _voieController.text),
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                if (textEditingValue.text.isEmpty) {
-                  return const Iterable<String>.empty();
-                }
-                return MedicationConstants.voies.where((String option) {
-                  return option
-                      .toLowerCase()
-                      .contains(textEditingValue.text.toLowerCase());
-                });
-              },
-              onSelected: (String selection) {
-                _voieController.text = selection;
-              },
-              fieldViewBuilder: (BuildContext context,
-                  TextEditingController fieldTextEditingController,
-                  FocusNode fieldFocusNode,
-                  VoidCallback onFieldSubmitted) {
-                // Synchroniser avec notre controller
-                if (fieldTextEditingController.text != _voieController.text) {
-                  fieldTextEditingController.text = _voieController.text;
-                }
-                
-                // Écouter les changements
-                fieldTextEditingController.addListener(() {
-                  _voieController.text = fieldTextEditingController.text;
-                });
-
-                return TextFormField(
-                  controller: fieldTextEditingController,
-                  focusNode: fieldFocusNode,
-                  decoration: const InputDecoration(
-                    labelText: 'Voie d\'administration',
-                    hintText: 'Ex: IV, PO, IM...',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.medical_services),
-                    helperText: 'Tapez pour voir les suggestions',
-                  ),
-                  textCapitalization: TextCapitalization.characters,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'La voie est obligatoire';
-                    }
-                    return null;
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Suggestions disponibles ou saisissez votre propre voie',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
+            // 1. Voie & Unité
+            _buildAutocompleteVoie(),
             const SizedBox(height: 16),
-
-            // Unité de dosage
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Unité (ex: mg, UI, mL)',
-                border: OutlineInputBorder(),
-              ),
-              value: _selectedUnite,
-              items: MedicationConstants.unites.map((unite) {
-                return DropdownMenuItem(
-                  value: unite,
-                  child: Text(unite),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedUnite = value;
-                });
-              },
-              validator: (value) =>
-                  value == null ? 'Sélectionnez une unité' : null,
-            ),
+            _buildDropdownUnite(),
             const SizedBox(height: 16),
-
-            // Préparation
+            
+            // 2. Préparation
             TextFormField(
               controller: _preparationController,
               decoration: const InputDecoration(
-                labelText: 'Préparation / Reconstitution (Optionnel)',
+                labelText: 'Préparation / Reconstitution',
                 border: OutlineInputBorder(),
                 hintText: 'Ex: Diluer dans 100mL de S.I.',
+                prefixIcon: Icon(Icons.science_outlined),
               ),
-              maxLines: 2,
             ),
+            const SizedBox(height: 24),
+            const Divider(),
+
+            // 3. Type de dosage (Switchs)
+            // On utilise un Radio-like UI avec des SwitchListTiles pour simplifier l'UX
+            _buildModeSelector(),
+
             const SizedBox(height: 16),
 
-            // Switch : Schéma complexe (texte libre) - Global
-            SwitchListTile(
-              title: const Text('Schéma complexe global (texte libre)'),
-              subtitle: const Text(
-                  'Si le dosage ne peut pas être exprimé par kg ou par tranches.'),
-              value: _useComplexScheme,
-              onChanged: (bool value) {
-                setState(() {
-                  _useComplexScheme = value;
-                  if (value) {
-                    _useTranches = false;
-                    _useDoseRange = false;
-                    _doseKgController.clear();
-                    _doseKgMinController.clear();
-                    _doseKgMaxController.clear();
-                  }
-                });
-              },
-            ),
-
-            // Affichage du champ "doses" si schéma complexe
-            if (_useComplexScheme) ...[
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _dosesController,
-                decoration: const InputDecoration(
-                  labelText: 'Posologie (Schéma complexe)',
-                  border: OutlineInputBorder(),
-                  hintText: 'Ex: 1/2 cp à J1, 1 cp à J2...',
-                ),
-                maxLines: 3,
-                validator: (value) =>
-                    _useComplexScheme && (value == null || value.trim().isEmpty)
-                        ? 'Saisissez la posologie complexe'
-                        : null,
-              ),
-            ],
-
-            // Affichage des options de dosage si schéma non-complexe global
-            if (!_useComplexScheme) ...[
-              // Switch: Tranches d'âge/poids
-              SwitchListTile(
-                title: const Text('Utiliser des tranches de poids/âge'),
-                value: _useTranches,
-                onChanged: (bool value) {
-                  setState(() {
-                    _useTranches = value;
-                    if (value) {
-                      _doseKgController.clear();
-                      _doseKgMinController.clear();
-                      _doseKgMaxController.clear();
-                      _useDoseRange = false;
-                      if (_tranches.isEmpty) {
-                        _tranches.add(TrancheData());
-                      }
-                    } else {
-                      _tranches.clear();
-                    }
-                  });
-                },
-              ),
-
-              // Affichage du dosage simple
-              if (!_useTranches) ...[
-                // Switch: Intervalle de dose
-                SwitchListTile(
-                  title: const Text('Utiliser un intervalle de dose/kg'),
-                  subtitle: const Text('Ex: 5-10 mg/kg'),
-                  value: _useDoseRange,
-                  onChanged: (bool value) {
-                    setState(() {
-                      _useDoseRange = value;
-                      if (value) {
-                        _doseKgController.clear();
-                      } else {
-                        _doseKgMinController.clear();
-                        _doseKgMaxController.clear();
-                      }
-                    });
-                  },
-                ),
-
-                // Champ(s) de dosage par kg
-                if (_useDoseRange)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _doseKgMinController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText:
-                                'Dose Min/kg (${_selectedUnite ?? 'unité'})',
-                            border: const OutlineInputBorder(),
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                                RegExp(r'^\d*\.?\d*')),
-                          ],
-                          validator: (value) =>
-                              _useDoseRange &&
-                                      (value == null || value.trim().isEmpty)
-                                  ? 'Requis'
-                                  : null,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _doseKgMaxController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText:
-                                'Dose Max/kg (${_selectedUnite ?? 'unité'})',
-                            border: const OutlineInputBorder(),
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                                RegExp(r'^\d*\.?\d*')),
-                          ],
-                          validator: (value) =>
-                              _useDoseRange &&
-                                      (value == null || value.trim().isEmpty)
-                                  ? 'Requis'
-                                  : null,
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  TextFormField(
-                    controller: _doseKgController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Dose/kg (${_selectedUnite ?? 'unité'})',
-                      border: const OutlineInputBorder(),
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                    ],
-                    validator: (value) =>
-                        !_useDoseRange && (value == null || value.trim().isEmpty)
-                            ? 'Requis'
-                            : null,
-                  ),
-                const SizedBox(height: 16),
-              ]
-
-              // Affichage des champs de tranches
-              else if (_useTranches) ...[
-                const Text('Tranches de Poids/Âge:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                ..._tranches.asMap().entries.map((entry) {
-                  int trancheIndex = entry.key;
-                  TrancheData tranche = entry.value;
-                  return TrancheForm(
-                    key: ValueKey(tranche),
-                    tranche: tranche,
-                    onDelete: () {
-                      setState(() {
-                        _tranches.removeAt(trancheIndex);
-                      });
-                    },
-                    onTrancheChange: (TrancheData updatedTranche) {
-                      _tranches[trancheIndex] = updatedTranche;
-                    },
-                    unite: _selectedUnite,
-                  );
-                }).toList(),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _tranches.add(TrancheData());
-                    });
-                  },
-                  child: const Text('Ajouter une tranche'),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Dose Maximale (Optionnel)
-              TextFormField(
+            // 4. Champs dynamiques selon le mode
+            if (_useComplexScheme)
+              _buildComplexSchemeField()
+            else if (_useTranches)
+              _buildTranchesEditor()
+            else
+              _buildSimpleDoseEditor(),
+              
+            const SizedBox(height: 16),
+            
+            // 5. Dose Max Globale
+             TextFormField(
                 controller: _doseMaxController,
-                keyboardType: TextInputType.number,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText:
-                      'Dose maximale (Optionnel) (${_selectedUnite ?? 'unité'})',
+                  labelText: 'Dose maximale absolue (${_selectedUnite ?? 'unité'})',
                   border: const OutlineInputBorder(),
+                  helperText: 'Plafond à ne jamais dépasser',
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                ],
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
               ),
-            ],
           ],
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Annuler'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
         ElevatedButton(
-          onPressed:
-              _voieController.text.trim().isEmpty || _selectedUnite == null 
-                  ? null 
-                  : _savePosology,
-          child: Text(widget.index == null ? 'Ajouter' : 'Enregistrer'),
+          onPressed: _voieController.text.isEmpty || _selectedUnite == null ? null : _savePosology,
+          child: const Text('Enregistrer'),
         ),
       ],
     );
   }
-}
 
-// ====================================================================
-// CLASSES DE SUPPORT POUR LES TRANCHES (TrancheData et TrancheForm)
-// ====================================================================
+  // --- SOUS-WIDGETS DE CONSTRUCTION ---
 
-class TrancheData {
-  final TextEditingController poidsMinController = TextEditingController();
-  final TextEditingController poidsMaxController = TextEditingController();
-  final TextEditingController ageMinController = TextEditingController();
-  final TextEditingController ageMaxController = TextEditingController();
-  final TextEditingController doseKgController = TextEditingController();
-  final TextEditingController doseKgMinController = TextEditingController();
-  final TextEditingController doseKgMaxController = TextEditingController();
-  final TextEditingController dosesController = TextEditingController();
-
-  bool useDoseRange = false;
-  bool useComplexScheme = false;
-
-  TrancheData();
-
-  static TrancheData fromTranche(Tranche tranche) {
-    final data = TrancheData();
-    if (tranche.poidsMin != null) {
-      data.poidsMinController.text = tranche.poidsMin.toString();
-    }
-    if (tranche.poidsMax != null) {
-      data.poidsMaxController.text = tranche.poidsMax.toString();
-    }
-    if (tranche.ageMin != null) {
-      data.ageMinController.text = tranche.ageMin.toString();
-    }
-    if (tranche.ageMax != null) {
-      data.ageMaxController.text = tranche.ageMax.toString();
-    }
-
-    if (tranche.doses != null) {
-      data.useComplexScheme = true;
-      data.dosesController.text = tranche.doses!;
-    } else if (tranche.doseKgMin != null && tranche.doseKgMax != null) {
-      data.useDoseRange = true;
-      data.doseKgMinController.text = tranche.doseKgMin.toString();
-      data.doseKgMaxController.text = tranche.doseKgMax.toString();
-    } else if (tranche.doseKg != null) {
-      data.doseKgController.text = tranche.doseKg.toString();
-    }
-    return data;
-  }
-
-  dynamic _parseNumber(String text) {
-    if (text.isEmpty) return null;
-    return double.tryParse(text) ?? int.tryParse(text);
-  }
-
-  Tranche toTranche() {
-    final bool useComplex = useComplexScheme;
-    
-    return Tranche(
-      poidsMin: _parseNumber(poidsMinController.text),
-      poidsMax: _parseNumber(poidsMaxController.text),
-      ageMin: _parseNumber(ageMinController.text),
-      ageMax: _parseNumber(ageMaxController.text),
-      doses: useComplex ? dosesController.text.trim() : null,
-      doseKg: !useComplex && !useDoseRange
-          ? _parseNumber(doseKgController.text)
-          : null,
-      doseKgMin: !useComplex && useDoseRange
-          ? _parseNumber(doseKgMinController.text)
-          : null,
-      doseKgMax: !useComplex && useDoseRange
-          ? _parseNumber(doseKgMaxController.text)
-          : null,
+  Widget _buildAutocompleteVoie() {
+    return Autocomplete<String>(
+      initialValue: TextEditingValue(text: _voieController.text),
+      optionsBuilder: (textEditingValue) {
+        if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+        return MedicationConstants.voies.where((opt) => opt.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+      },
+      onSelected: (selection) => _voieController.text = selection,
+      fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+        if (controller.text != _voieController.text) controller.text = _voieController.text;
+        controller.addListener(() => _voieController.text = controller.text);
+        return TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          decoration: const InputDecoration(
+            labelText: 'Voie d\'administration *',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.medical_services),
+          ),
+          validator: (val) => val == null || val.isEmpty ? 'Requis' : null,
+        );
+      },
     );
   }
 
-  void dispose() {
-    poidsMinController.dispose();
-    poidsMaxController.dispose();
-    ageMinController.dispose();
-    ageMaxController.dispose();
-    doseKgController.dispose();
-    doseKgMinController.dispose();
-    doseKgMaxController.dispose();
-    dosesController.dispose();
+  Widget _buildDropdownUnite() {
+    return DropdownButtonFormField<String>(
+      decoration: const InputDecoration(labelText: 'Unité *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.scale)),
+      value: _selectedUnite,
+      items: MedicationConstants.unites.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+      onChanged: (v) => setState(() => _selectedUnite = v),
+      validator: (v) => v == null ? 'Requis' : null,
+    );
   }
-}
 
-class TrancheForm extends StatefulWidget {
-  final TrancheData tranche;
-  final VoidCallback onDelete;
-  final Function(TrancheData) onTrancheChange;
-  final String? unite;
-
-  const TrancheForm({
-    super.key,
-    required this.tranche,
-    required this.onDelete,
-    required this.onTrancheChange,
-    this.unite,
-  });
-
-  @override
-  State<TrancheForm> createState() => _TrancheFormState();
-}
-
-class _TrancheFormState extends State<TrancheForm> {
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Tranche de Poids/Âge',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: widget.onDelete,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Champs Poids (Min/Max)
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: widget.tranche.poidsMinController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Poids Min (kg)',
-                      border: OutlineInputBorder(),
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextFormField(
-                    controller: widget.tranche.poidsMaxController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Poids Max (kg)',
-                      border: OutlineInputBorder(),
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Champs Âge (Min/Max)
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: widget.tranche.ageMinController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Âge Min (Mois)',
-                      border: OutlineInputBorder(),
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextFormField(
-                    controller: widget.tranche.ageMaxController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Âge Max (Mois)',
-                      border: const OutlineInputBorder(),
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Switch : Schéma complexe (texte libre) pour la tranche
-            SwitchListTile(
-              title:
-                  const Text('Schéma complexe (texte libre) pour cette tranche'),
-              subtitle: const Text(
-                  'Permet de saisir le dosage sous forme de texte libre.'),
-              value: widget.tranche.useComplexScheme,
-              onChanged: (bool value) {
-                setState(() {
-                  widget.tranche.useComplexScheme = value;
-                  if (value) {
-                    widget.tranche.useDoseRange = false;
-                    widget.tranche.doseKgController.clear();
-                    widget.tranche.doseKgMinController.clear();
-                    widget.tranche.doseKgMaxController.clear();
-                  }
-                  widget.onTrancheChange(widget.tranche);
-                });
-              },
-              contentPadding: EdgeInsets.zero,
-            ),
-            const SizedBox(height: 8),
-
-            // Affichage du champ "doses" si schéma complexe
-            if (widget.tranche.useComplexScheme)
-              TextFormField(
-                controller: widget.tranche.dosesController,
-                decoration: const InputDecoration(
-                  labelText: 'Posologie de la tranche (Texte libre)',
-                  border: OutlineInputBorder(),
-                  hintText: 'Ex: S0: 80 mg, S2: 40 mg, S4: 20 mg puis 20 mg/15j',
-                ),
-                maxLines: 3,
-                validator: (value) =>
-                    widget.tranche.useComplexScheme &&
-                            (value == null || value.trim().isEmpty)
-                        ? 'Saisissez la posologie complexe'
-                        : null,
-              )
-            else
-              Column(
-                children: [
-                  // Dose simple vs Intervalle de dose
-                  SwitchListTile(
-                    title: const Text('Utiliser un intervalle de dose/kg'),
-                    subtitle: Text('Ex: 5-10 ${widget.unite ?? 'unité'}/kg'),
-                    value: widget.tranche.useDoseRange,
-                    onChanged: (bool value) {
-                      setState(() {
-                        widget.tranche.useDoseRange = value;
-                        widget.onTrancheChange(widget.tranche);
-                      });
-                    },
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  const SizedBox(height: 8),
-
-                  if (widget.tranche.useDoseRange)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: widget.tranche.doseKgMinController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText:
-                                  'Dose Min/kg (${widget.unite ?? 'unité'})',
-                              border: const OutlineInputBorder(),
-                            ),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                  RegExp(r'^\d*\.?\d*')),
-                            ],
-                             validator: (value) =>
-                                widget.tranche.useDoseRange &&
-                                        (value == null || value.trim().isEmpty)
-                                    ? 'Requis'
-                                    : null,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextFormField(
-                            controller: widget.tranche.doseKgMaxController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText:
-                                  'Dose Max/kg (${widget.unite ?? 'unité'})',
-                              border: const OutlineInputBorder(),
-                            ),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                  RegExp(r'^\d*\.?\d*')),
-                            ],
-                             validator: (value) =>
-                                widget.tranche.useDoseRange &&
-                                        (value == null || value.trim().isEmpty)
-                                    ? 'Requis'
-                                    : null,
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    TextFormField(
-                      controller: widget.tranche.doseKgController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Dose/kg (${widget.unite ?? 'unité'})',
-                        border: const OutlineInputBorder(),
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                      ],
-                       validator: (value) =>
-                          !widget.tranche.useDoseRange &&
-                                  (value == null || value.trim().isEmpty)
-                              ? 'Requis'
-                              : null,
-                    ),
-                ],
-              ),
-          ],
+  Widget _buildModeSelector() {
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('Schéma complexe (texte libre)'),
+          subtitle: const Text('Pour les protocoles dégressifs ou atypiques'),
+          value: _useComplexScheme,
+          onChanged: (val) {
+            setState(() {
+              _useComplexScheme = val;
+              if (val) {
+                _useTranches = false; 
+                _useDoseRange = false;
+              }
+            });
+          },
         ),
+        if (!_useComplexScheme) ...[
+          SwitchListTile(
+            title: const Text('Doser par tranches (Poids/Âge)'),
+            subtitle: const Text('Pour varier la dose selon le patient'),
+            value: _useTranches,
+            onChanged: (val) {
+              setState(() {
+                _useTranches = val;
+                if (val) _useDoseRange = false;
+                if (val && _tranches.isEmpty) _tranches.add(TrancheData());
+              });
+            },
+          ),
+        ]
+      ],
+    );
+  }
+
+  Widget _buildComplexSchemeField() {
+    return TextFormField(
+      controller: _dosesController,
+      decoration: const InputDecoration(
+        labelText: 'Description du schéma',
+        border: OutlineInputBorder(),
+        hintText: 'Ex: J1: 10mg/kg, J2: 5mg/kg...',
       ),
+      maxLines: 4,
+      validator: (v) => _useComplexScheme && (v == null || v.isEmpty) ? 'Requis' : null,
+    );
+  }
+
+  Widget _buildSimpleDoseEditor() {
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('Intervalle de dose (Min-Max)'),
+          value: _useDoseRange,
+          onChanged: (val) => setState(() => _useDoseRange = val),
+        ),
+        const SizedBox(height: 8),
+        DoseInputWidget(
+          unite: '${_selectedUnite ?? 'unité'}/kg',
+          useDoseRange: _useDoseRange,
+          doseController: _doseKgController,
+          minController: _doseKgMinController,
+          maxController: _doseKgMaxController,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTranchesEditor() {
+    return Column(
+      children: [
+        ..._tranches.asMap().entries.map((entry) {
+          return TrancheEditor(
+            key: ObjectKey(entry.value), // Important pour éviter les bugs de reorder/delete
+            tranche: entry.value,
+            unite: _selectedUnite,
+            onDelete: () => setState(() => _tranches.removeAt(entry.key)),
+            onTrancheChange: (t) {}, // La ref est passée par référence, pas besoin d'update complexe
+          );
+        }),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.add),
+          label: const Text('Ajouter une tranche'),
+          onPressed: () => setState(() => _tranches.add(TrancheData())),
+        ),
+      ],
     );
   }
 }
