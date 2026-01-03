@@ -1,15 +1,19 @@
-// Types de blocs disponibles
+import 'package:uuid/uuid.dart';
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
 enum BlockType {
-  section,      // Tuile collapsible
-  texte,        // Texte formaté
-  tableau,      // Tableau de données
-  image,        // Image (base64 ou URL)
-  medicament,   // Référence médicament avec calcul de dose
-  formulaire,   // Formulaire interactif avec calcul de score
-  alerte,       // Alerte/avertissement
+  section,
+  texte,
+  tableau,
+  image,
+  medicament,
+  formulaire,
+  alerte,
 }
 
-// Niveaux d'alerte
 enum AlerteNiveau {
   info,
   attention,
@@ -17,7 +21,6 @@ enum AlerteNiveau {
   critique,
 }
 
-// Niveaux d'interprétation de score
 enum InterpretationNiveau {
   faible,
   modere,
@@ -25,7 +28,6 @@ enum InterpretationNiveau {
   critique,
 }
 
-// Types de champs pour les formulaires
 enum ChampType {
   nombre,
   selection,
@@ -33,7 +35,10 @@ enum ChampType {
   radio,
 }
 
-/// Classe principale du protocole
+// =============================================================================
+// CLASSE PRINCIPALE : PROTOCOL
+// =============================================================================
+
 class Protocol {
   final String titre;
   final String? description;
@@ -41,7 +46,7 @@ class Protocol {
   final String? version;
   final DateTime? dateModification;
   final List<ProtocolBlock> blocs;
-  final String? fileName; // Nom du fichier source (pour éviter les doublons)
+  final String? fileName;
 
   Protocol({
     required this.titre,
@@ -54,16 +59,11 @@ class Protocol {
   });
 
   factory Protocol.fromJson(Map<String, dynamic> json, {String? sourceFileName}) {
-    // Conversion des blocs
     List<ProtocolBlock> blocs = [];
-    
     if (json['blocs'] != null) {
       blocs = (json['blocs'] as List)
           .map((bloc) => ProtocolBlock.fromJson(bloc))
           .toList();
-    } else if (json['etapes'] != null) {
-      // Rétrocompatibilité avec l'ancien format
-      blocs = _convertOldFormat(json['etapes'] as List);
     }
 
     return Protocol(
@@ -90,13 +90,10 @@ class Protocol {
     };
   }
 
-  /// Génère un nom de fichier sécurisé à partir du titre
   String generateFileName() {
     if (fileName != null && fileName!.isNotEmpty) {
       return fileName!;
     }
-    
-    // Convertir les accents et caractères spéciaux
     String safe = titre
         .toLowerCase()
         .replaceAll(RegExp(r'[àáâãäå]'), 'a')
@@ -107,13 +104,11 @@ class Protocol {
         .replaceAll(RegExp(r'[ýÿ]'), 'y')
         .replaceAll(RegExp(r'[ç]'), 'c')
         .replaceAll(RegExp(r'[ñ]'), 'n')
-        .replaceAll(RegExp(r'[œ]'), 'oe')
-        .replaceAll(RegExp(r'[æ]'), 'ae')
-        .replaceAll(RegExp(r"[''`]"), '')
         .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
         .replaceAll(RegExp(r'_+'), '_')
         .replaceAll(RegExp(r'^_|_$'), '');
     
+    if (safe.isEmpty) return 'protocole_sans_nom.json';
     return '$safe.json';
   }
 
@@ -136,81 +131,25 @@ class Protocol {
       fileName: fileName ?? this.fileName,
     );
   }
-
-  /// Convertit l'ancien format (étapes) vers le nouveau format (blocs)
-  static List<ProtocolBlock> _convertOldFormat(List<dynamic> etapes) {
-    List<ProtocolBlock> blocs = [];
-    int ordre = 0;
-
-    for (var etape in etapes) {
-      final Map<String, dynamic> e = etape as Map<String, dynamic>;
-      
-      // Créer une section pour chaque étape
-      List<ProtocolBlock> contenu = [];
-      int subOrdre = 0;
-
-      // Ajouter le contenu texte si présent
-      if (e['contenu'] != null) {
-        contenu.add(TexteBlock(
-          contenu: e['contenu'],
-          ordre: subOrdre++,
-        ));
-      }
-
-      // Ajouter les médicaments si présents
-      if (e['medicaments'] != null) {
-        for (var med in e['medicaments']) {
-          contenu.add(MedicamentBlock(
-            nomMedicament: med['nom'] ?? med['medicament'],
-            indication: med['indication'],
-            voie: med['voie'],
-            commentaire: med['commentaire'],
-            ordre: subOrdre++,
-          ));
-        }
-      }
-
-      // Ajouter les tableaux si présents
-      if (e['tableau'] != null) {
-        final tableau = e['tableau'];
-        contenu.add(TableauBlock(
-          titre: tableau['titre'],
-          colonnes: List<String>.from(tableau['colonnes'] ?? []),
-          lignes: (tableau['lignes'] as List?)
-              ?.map((l) => List<String>.from(l))
-              .toList() ?? [],
-          ordre: subOrdre++,
-        ));
-      }
-
-      // Créer la section
-      blocs.add(SectionBlock(
-        titre: e['titre'] ?? 'Étape ${ordre + 1}',
-        temps: e['temps'],
-        initialementOuvert: ordre == 0,
-        contenu: contenu,
-        ordre: ordre++,
-      ));
-    }
-
-    return blocs;
-  }
 }
 
-/// Classe abstraite pour tous les blocs
+// =============================================================================
+// CLASSE ABSTRAITE : BLOC
+// =============================================================================
+
 abstract class ProtocolBlock {
   final BlockType type;
   final int ordre;
-  final String? id;
+  final String id; // ID unique non-nullable (UUID v4 par défaut)
 
   ProtocolBlock({
     required this.type,
     required this.ordre,
-    this.id,
-  });
+    String? id,
+  }) : id = id ?? const Uuid().v4();
 
   factory ProtocolBlock.fromJson(Map<String, dynamic> json) {
-    final typeStr = json['type'] as String;
+    final typeStr = json['type'] as String? ?? 'texte';
     final type = BlockType.values.firstWhere(
       (t) => t.name == typeStr,
       orElse: () => BlockType.texte,
@@ -236,10 +175,18 @@ abstract class ProtocolBlock {
 
   Map<String, dynamic> toJson();
 
-  ProtocolBlock copyWithOrdre(int newOrdre);
+  // Méthode abstraite pour copyWith
+  ProtocolBlock copyWith({int? ordre, String? id});
+  
+  // Helper
+  ProtocolBlock copyWithOrdre(int newOrdre) => copyWith(ordre: newOrdre);
 }
 
-/// Section collapsible contenant d'autres blocs
+// =============================================================================
+// BLOCS CONCRETS
+// =============================================================================
+
+/// 1. SECTION BLOCK
 class SectionBlock extends ProtocolBlock {
   final String titre;
   final String? temps;
@@ -261,8 +208,9 @@ class SectionBlock extends ProtocolBlock {
       temps: json['temps'],
       initialementOuvert: json['initialementOuvert'] ?? false,
       contenu: (json['contenu'] as List?)
-          ?.map((b) => ProtocolBlock.fromJson(b))
-          .toList() ?? [],
+              ?.map((b) => ProtocolBlock.fromJson(b))
+              .toList() ??
+          [],
       ordre: json['ordre'] ?? 0,
       id: json['id'],
     );
@@ -277,22 +225,11 @@ class SectionBlock extends ProtocolBlock {
       'initialementOuvert': initialementOuvert,
       'contenu': contenu.map((b) => b.toJson()).toList(),
       'ordre': ordre,
-      if (id != null) 'id': id,
+      'id': id,
     };
   }
 
   @override
-  SectionBlock copyWithOrdre(int newOrdre) {
-    return SectionBlock(
-      titre: titre,
-      temps: temps,
-      initialementOuvert: initialementOuvert,
-      contenu: contenu,
-      ordre: newOrdre,
-      id: id,
-    );
-  }
-
   SectionBlock copyWith({
     String? titre,
     String? temps,
@@ -312,12 +249,12 @@ class SectionBlock extends ProtocolBlock {
   }
 }
 
-/// Format de texte
+/// Helper pour TexteBlock
 class TexteFormat {
   final bool gras;
   final bool italique;
   final bool souligne;
-  final String? couleur; // Couleur hex (#RRGGBB)
+  final String? couleur;
   final int? taillePolicePx;
 
   TexteFormat({
@@ -366,7 +303,7 @@ class TexteFormat {
   }
 }
 
-/// Bloc de texte formaté
+/// 2. TEXTE BLOCK
 class TexteBlock extends ProtocolBlock {
   final String contenu;
   final TexteFormat? format;
@@ -381,8 +318,8 @@ class TexteBlock extends ProtocolBlock {
   factory TexteBlock.fromJson(Map<String, dynamic> json) {
     return TexteBlock(
       contenu: json['contenu'] ?? '',
-      format: json['format'] != null 
-          ? TexteFormat.fromJson(json['format']) 
+      format: json['format'] != null
+          ? TexteFormat.fromJson(json['format'])
           : null,
       ordre: json['ordre'] ?? 0,
       id: json['id'],
@@ -396,20 +333,11 @@ class TexteBlock extends ProtocolBlock {
       'contenu': contenu,
       if (format != null) 'format': format!.toJson(),
       'ordre': ordre,
-      if (id != null) 'id': id,
+      'id': id,
     };
   }
 
   @override
-  TexteBlock copyWithOrdre(int newOrdre) {
-    return TexteBlock(
-      contenu: contenu,
-      format: format,
-      ordre: newOrdre,
-      id: id,
-    );
-  }
-
   TexteBlock copyWith({
     String? contenu,
     TexteFormat? format,
@@ -425,7 +353,7 @@ class TexteBlock extends ProtocolBlock {
   }
 }
 
-/// Bloc tableau de données
+/// 3. TABLEAU BLOCK
 class TableauBlock extends ProtocolBlock {
   final String? titre;
   final List<String> colonnes;
@@ -446,8 +374,9 @@ class TableauBlock extends ProtocolBlock {
       titre: json['titre'],
       colonnes: List<String>.from(json['colonnes'] ?? []),
       lignes: (json['lignes'] as List?)
-          ?.map((l) => List<String>.from(l))
-          .toList() ?? [],
+              ?.map((l) => List<String>.from(l))
+              .toList() ??
+          [],
       avecEntete: json['avecEntete'] ?? true,
       ordre: json['ordre'] ?? 0,
       id: json['id'],
@@ -463,22 +392,11 @@ class TableauBlock extends ProtocolBlock {
       'lignes': lignes,
       'avecEntete': avecEntete,
       'ordre': ordre,
-      if (id != null) 'id': id,
+      'id': id,
     };
   }
 
   @override
-  TableauBlock copyWithOrdre(int newOrdre) {
-    return TableauBlock(
-      titre: titre,
-      colonnes: colonnes,
-      lignes: lignes,
-      avecEntete: avecEntete,
-      ordre: newOrdre,
-      id: id,
-    );
-  }
-
   TableauBlock copyWith({
     String? titre,
     List<String>? colonnes,
@@ -498,12 +416,12 @@ class TableauBlock extends ProtocolBlock {
   }
 }
 
-/// Bloc image (URL ou base64)
+/// 4. IMAGE BLOCK
 class ImageBlock extends ProtocolBlock {
-  final String source; // URL ou données base64
+  final String source;
   final bool estBase64;
   final String? legende;
-  final int? largeurPourcent; // Largeur en pourcentage (1-100)
+  final int? largeurPourcent;
 
   ImageBlock({
     required this.source,
@@ -534,22 +452,11 @@ class ImageBlock extends ProtocolBlock {
       if (legende != null) 'legende': legende,
       if (largeurPourcent != null) 'largeurPourcent': largeurPourcent,
       'ordre': ordre,
-      if (id != null) 'id': id,
+      'id': id,
     };
   }
 
   @override
-  ImageBlock copyWithOrdre(int newOrdre) {
-    return ImageBlock(
-      source: source,
-      estBase64: estBase64,
-      legende: legende,
-      largeurPourcent: largeurPourcent,
-      ordre: newOrdre,
-      id: id,
-    );
-  }
-
   ImageBlock copyWith({
     String? source,
     bool? estBase64,
@@ -569,7 +476,7 @@ class ImageBlock extends ProtocolBlock {
   }
 }
 
-/// Condition de poids/âge pour un médicament
+/// Helper pour MedicamentBlock
 class MedicamentCondition {
   final num? poidsMin;
   final num? poidsMax;
@@ -615,67 +522,18 @@ class MedicamentCondition {
     );
   }
 
-  /// Vérifie si la condition est remplie pour un poids donné
-  bool matchesPoids(num poids) {
-    if (poidsMin != null && poids < poidsMin!) return false;
-    if (poidsMax != null && poids > poidsMax!) return false;
-    return true;
-  }
-
-  /// Vérifie si la condition est remplie pour un âge donné (en mois)
-  bool matchesAge(num ageMois) {
-    if (ageMinMois != null && ageMois < ageMinMois!) return false;
-    if (ageMaxMois != null && ageMois > ageMaxMois!) return false;
-    return true;
-  }
-
-  /// Description lisible de la condition
-  String get description {
-    final parts = <String>[];
-    
-    if (poidsMin != null || poidsMax != null) {
-      if (poidsMin != null && poidsMax != null) {
-        parts.add('Poids: $poidsMin - $poidsMax kg');
-      } else if (poidsMin != null) {
-        parts.add('Poids ≥ $poidsMin kg');
-      } else {
-        parts.add('Poids ≤ $poidsMax kg');
-      }
-    }
-    
-    if (ageMinMois != null || ageMaxMois != null) {
-      if (ageMinMois != null && ageMaxMois != null) {
-        parts.add('Âge: ${_formatAge(ageMinMois!)} - ${_formatAge(ageMaxMois!)}');
-      } else if (ageMinMois != null) {
-        parts.add('Âge ≥ ${_formatAge(ageMinMois!)}');
-      } else {
-        parts.add('Âge ≤ ${_formatAge(ageMaxMois!)}');
-      }
-    }
-    
-    return parts.isEmpty ? 'Tous patients' : parts.join(', ');
-  }
-
-  String _formatAge(num mois) {
-    if (mois < 12) return '$mois mois';
-    final annees = mois ~/ 12;
-    final moisRestants = mois % 12;
-    if (moisRestants == 0) return '$annees ans';
-    return '$annees ans $moisRestants mois';
-  }
-
-  bool get isEmpty => 
-      poidsMin == null && poidsMax == null && 
+  bool get isEmpty =>
+      poidsMin == null && poidsMax == null &&
       ageMinMois == null && ageMaxMois == null;
 }
 
-/// Bloc référence médicament avec condition optionnelle
+/// 5. MEDICAMENT BLOCK
 class MedicamentBlock extends ProtocolBlock {
   final String nomMedicament;
   final String? indication;
   final String? voie;
   final String? commentaire;
-  final MedicamentCondition? condition; // NOUVEAU: condition de poids/âge
+  final MedicamentCondition? condition;
 
   MedicamentBlock({
     required this.nomMedicament,
@@ -693,7 +551,7 @@ class MedicamentBlock extends ProtocolBlock {
       indication: json['indication'],
       voie: json['voie'],
       commentaire: json['commentaire'],
-      condition: json['condition'] != null 
+      condition: json['condition'] != null
           ? MedicamentCondition.fromJson(json['condition'])
           : null,
       ordre: json['ordre'] ?? 0,
@@ -709,25 +567,14 @@ class MedicamentBlock extends ProtocolBlock {
       if (indication != null) 'indication': indication,
       if (voie != null) 'voie': voie,
       if (commentaire != null) 'commentaire': commentaire,
-      if (condition != null && !condition!.isEmpty) 'condition': condition!.toJson(),
+      if (condition != null && !condition!.isEmpty)
+        'condition': condition!.toJson(),
       'ordre': ordre,
-      if (id != null) 'id': id,
+      'id': id,
     };
   }
 
   @override
-  MedicamentBlock copyWithOrdre(int newOrdre) {
-    return MedicamentBlock(
-      nomMedicament: nomMedicament,
-      indication: indication,
-      voie: voie,
-      commentaire: commentaire,
-      condition: condition,
-      ordre: newOrdre,
-      id: id,
-    );
-  }
-
   MedicamentBlock copyWith({
     String? nomMedicament,
     String? indication,
@@ -747,24 +594,17 @@ class MedicamentBlock extends ProtocolBlock {
       id: id ?? this.id,
     );
   }
-
-  /// Vérifie si ce médicament doit être affiché pour un poids donné
-  bool shouldShowForWeight(num? poids) {
-    if (condition == null || condition!.isEmpty) return true;
-    if (poids == null) return true; // Afficher si pas de poids spécifié
-    return condition!.matchesPoids(poids);
-  }
 }
 
-/// Option pour un champ de formulaire
+// =============================================================================
+// CLASSES FORMULAIRE (AVEC COPYWITH AJOUTÉ)
+// =============================================================================
+
 class FormulaireOption {
   final String label;
-  final dynamic valeur; // peut être un nombre ou une string
+  final dynamic valeur;
 
-  FormulaireOption({
-    required this.label,
-    required this.valeur,
-  });
+  FormulaireOption({required this.label, required this.valeur});
 
   factory FormulaireOption.fromJson(Map<String, dynamic> json) {
     return FormulaireOption(
@@ -773,12 +613,7 @@ class FormulaireOption {
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'label': label,
-      'valeur': valeur,
-    };
-  }
+  Map<String, dynamic> toJson() => {'label': label, 'valeur': valeur};
 
   FormulaireOption copyWith({
     String? label,
@@ -791,16 +626,15 @@ class FormulaireOption {
   }
 }
 
-/// Champ d'un formulaire
 class FormulaireChamp {
   final String id;
   final String label;
   final ChampType type;
-  final List<FormulaireOption>? options; // Pour selection, radio
+  final List<FormulaireOption>? options;
   final num? min;
   final num? max;
   final dynamic defaut;
-  final int? points; // Points attribués si checkbox cochée
+  final int? points;
 
   FormulaireChamp({
     required this.id,
@@ -867,12 +701,11 @@ class FormulaireChamp {
   }
 }
 
-/// Interprétation d'un score
 class FormulaireInterpretation {
   final num min;
   final num max;
   final String texte;
-  final String? couleur; // Couleur hex
+  final String? couleur;
   final InterpretationNiveau? niveau;
 
   FormulaireInterpretation({
@@ -925,12 +758,12 @@ class FormulaireInterpretation {
   }
 }
 
-/// Bloc formulaire interactif avec calcul de score
+/// 6. FORMULAIRE BLOCK
 class FormulaireBlock extends ProtocolBlock {
   final String titre;
   final String? description;
   final List<FormulaireChamp> champs;
-  final String? formuleCalcul; // Formule pour calculer le score (optionnel, sinon somme)
+  final String? formuleCalcul;
   final List<FormulaireInterpretation>? interpretations;
 
   FormulaireBlock({
@@ -948,8 +781,9 @@ class FormulaireBlock extends ProtocolBlock {
       titre: json['titre'] ?? 'Formulaire',
       description: json['description'],
       champs: (json['champs'] as List?)
-          ?.map((c) => FormulaireChamp.fromJson(c))
-          .toList() ?? [],
+              ?.map((c) => FormulaireChamp.fromJson(c))
+              .toList() ??
+          [],
       formuleCalcul: json['formuleCalcul'],
       interpretations: (json['interpretations'] as List?)
           ?.map((i) => FormulaireInterpretation.fromJson(i))
@@ -970,23 +804,11 @@ class FormulaireBlock extends ProtocolBlock {
       if (interpretations != null)
         'interpretations': interpretations!.map((i) => i.toJson()).toList(),
       'ordre': ordre,
-      if (id != null) 'id': id,
+      'id': id,
     };
   }
 
   @override
-  FormulaireBlock copyWithOrdre(int newOrdre) {
-    return FormulaireBlock(
-      titre: titre,
-      description: description,
-      champs: champs,
-      formuleCalcul: formuleCalcul,
-      interpretations: interpretations,
-      ordre: newOrdre,
-      id: id,
-    );
-  }
-
   FormulaireBlock copyWith({
     String? titre,
     String? description,
@@ -1008,7 +830,7 @@ class FormulaireBlock extends ProtocolBlock {
   }
 }
 
-/// Bloc alerte/avertissement
+/// 7. ALERTE BLOCK
 class AlerteBlock extends ProtocolBlock {
   final String contenu;
   final AlerteNiveau niveau;
@@ -1039,20 +861,11 @@ class AlerteBlock extends ProtocolBlock {
       'contenu': contenu,
       'niveau': niveau.name,
       'ordre': ordre,
-      if (id != null) 'id': id,
+      'id': id,
     };
   }
 
   @override
-  AlerteBlock copyWithOrdre(int newOrdre) {
-    return AlerteBlock(
-      contenu: contenu,
-      niveau: niveau,
-      ordre: newOrdre,
-      id: id,
-    );
-  }
-
   AlerteBlock copyWith({
     String? contenu,
     AlerteNiveau? niveau,

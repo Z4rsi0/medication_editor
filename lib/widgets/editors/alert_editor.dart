@@ -22,6 +22,16 @@ class _AlerteBlockEditorState extends State<AlerteBlockEditor> {
   }
 
   @override
+  void didUpdateWidget(AlerteBlockEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.block.contenu != _contenuController.text) {
+      _contenuController.text = widget.block.contenu;
+      _contenuController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _contenuController.text.length));
+    }
+  }
+
+  @override
   void dispose() {
     _contenuController.dispose();
     super.dispose();

@@ -8,7 +8,7 @@ import '../widgets/editors/block_factory.dart';
 import '../widgets/editors/block_type_selector.dart';
 
 // ============================================================================
-// ÉCRAN 1 : LISTE DES PROTOCOLES (Inchangé ou presque, inclus pour contexte)
+// ÉCRAN 1 : LISTE DES PROTOCOLES (Inchangé)
 // ============================================================================
 class ProtocolListScreen extends StatefulWidget {
   const ProtocolListScreen({super.key});
@@ -265,7 +265,7 @@ class _ProtocolCard extends StatelessWidget {
 }
 
 // ============================================================================
-// ÉCRAN 2 : ÉDITEUR DE PROTOCOLE - ARCHITECTURE SLIVER OPTIMISÉE
+// ÉCRAN 2 : ÉDITEUR DE PROTOCOLE - ARCHITECTURE CORRIGÉE
 // ============================================================================
 
 class ProtocolEditorScreen extends StatefulWidget {
@@ -291,6 +291,7 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
   void initState() {
     super.initState();
     _protocol = widget.protocol;
+    
     _titreController = TextEditingController(text: _protocol.titre);
     _descriptionController =
         TextEditingController(text: _protocol.description ?? '');
@@ -348,7 +349,6 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Récupérer le MedicationProvider pour l'autocomplétion
     final medicationProvider = Provider.of<MedicationProvider>(context);
 
     // ignore: deprecated_member_use
@@ -381,144 +381,149 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
         return ret == 'discard';
       },
       child: Scaffold(
-        backgroundColor: Colors.grey.shade100, // Fond légèrement grisé
-        body: CustomScrollView(
-          // Utilisation de Slivers pour la performance
-          slivers: [
-            // 1. App Bar Sliver
-            SliverAppBar(
-              title: Text(_protocol.fileName == null ? 'Nouveau' : 'Modifier'),
-              floating: true,
-              pinned: true,
-              actions: [
-                Consumer<ProtocolProvider>(
-                  builder: (context, provider, _) {
-                    if (provider.isLoading) {
-                      return const Padding(
-                          padding: EdgeInsets.only(right: 16),
-                          child: Center(
-                              child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white))));
-                    }
-                    return TextButton.icon(
-                      onPressed: _hasChanges ? () => _save(context) : null,
-                      icon: const Icon(Icons.save),
-                      label: const Text('Enregistrer'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: _hasChanges
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.5),
-                      ),
-                    );
-                  },
-                ),
-              ],
+        backgroundColor: Colors.grey.shade100,
+        appBar: AppBar(
+          title: Text(_protocol.fileName == null ? 'Nouveau' : 'Modifier'),
+          actions: [
+            Consumer<ProtocolProvider>(
+              builder: (context, provider, _) {
+                if (provider.isLoading) {
+                  return const Padding(
+                      padding: EdgeInsets.only(right: 16),
+                      child: Center(
+                          child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))));
+                }
+                return TextButton.icon(
+                  onPressed: _hasChanges ? () => _save(context) : null,
+                  icon: const Icon(Icons.save, color: Colors.white),
+                  label: const Text('Enregistrer', style: TextStyle(color: Colors.white)),
+                );
+              },
             ),
-
-            // 2. Métadonnées (Box Adapter)
-            SliverToBoxAdapter(
-              child: Card(
-                margin: const EdgeInsets.all(16),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        // Remplacement de CustomScrollView par ReorderableListView
+        // pour une meilleure stabilité et gestion du drag
+        body: ReorderableListView.builder(
+          buildDefaultDragHandles: false, // On utilise nos propres poignées
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+          header: Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Infos Générales',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  TextField(
+                      controller: _titreController,
+                      decoration: const InputDecoration(labelText: 'Titre *'),
+                      onChanged: (_) => _updateMeta()),
+                  const SizedBox(height: 8),
+                  TextField(
+                      controller: _descriptionController,
+                      decoration:
+                          const InputDecoration(labelText: 'Description'),
+                      maxLines: 2,
+                      onChanged: (_) => _updateMeta()),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(
+                        child: TextField(
+                            controller: _auteurController,
+                            decoration:
+                                const InputDecoration(labelText: 'Auteur'),
+                            onChanged: (_) => _updateMeta())),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: TextField(
+                            controller: _versionController,
+                            decoration:
+                                const InputDecoration(labelText: 'Version'),
+                            onChanged: (_) => _updateMeta())),
+                  ]),
+                  const SizedBox(height: 16),
+                  Row(
                     children: [
-                      const Text('Infos Générales',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
-                      TextField(
-                          controller: _titreController,
-                          decoration: const InputDecoration(labelText: 'Titre *'),
-                          onChanged: (_) => _updateMeta()),
-                      const SizedBox(height: 8),
-                      TextField(
-                          controller: _descriptionController,
-                          decoration:
-                              const InputDecoration(labelText: 'Description'),
-                          maxLines: 2,
-                          onChanged: (_) => _updateMeta()),
-                      const SizedBox(height: 8),
-                      Row(children: [
-                        Expanded(
-                            child: TextField(
-                                controller: _auteurController,
-                                decoration:
-                                    const InputDecoration(labelText: 'Auteur'),
-                                onChanged: (_) => _updateMeta())),
-                        const SizedBox(width: 8),
-                        Expanded(
-                            child: TextField(
-                                controller: _versionController,
-                                decoration:
-                                    const InputDecoration(labelText: 'Version'),
-                                onChanged: (_) => _updateMeta())),
-                      ]),
+                      const Text('Contenu du protocole',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      FilledButton.icon(
+                        onPressed: _addBlock,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Ajouter'),
+                      ),
                     ],
                   ),
-                ),
+                ],
               ),
             ),
-
-            // 3. Header "Contenu"
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    const Text('Contenu du protocole',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    const Spacer(),
-                    FilledButton.icon(
-                      onPressed: _addBlock,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Ajouter un bloc'),
+          ),
+          itemCount: _protocol.blocs.length,
+          onReorder: _reorderBlocks,
+          itemBuilder: (context, index) {
+            final block = _protocol.blocs[index];
+            
+            // KEY STABLE BASÉE SUR L'UUID
+            // C'est ici que le problème du clavier est résolu au niveau liste
+            return Container(
+              key: ValueKey(block.id),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // POIGNÉE DE DRAG EXPLICITE
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          bottomLeft: Radius.circular(12),
+                        ),
+                      ),
+                      height: 100, // Hauteur arbitraire pour la zone de drag
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.drag_indicator, color: Colors.grey),
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-            // 4. Liste des blocs (SliverReorderableList)
-            if (_protocol.blocs.isEmpty)
-              const SliverToBoxAdapter(
-                child: Center(
+                  ),
+                  
+                  // CONTENU EDITABLE
+                  Expanded(
                     child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text(
-                            'Aucun bloc. Ajoutez-en un pour commencer !',
-                            style: TextStyle(color: Colors.grey)))),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverReorderableList(
-                  itemCount: _protocol.blocs.length,
-                  onReorder: _reorderBlocks,
-                  itemBuilder: (context, index) {
-                    final block = _protocol.blocs[index];
-                    // IMPORTANT : ReorderableDragStartListener est nécessaire ici
-                    return ReorderableDragStartListener(
-                      key: ValueKey('block_${block.hashCode}'),
-                      index: index,
+                      padding: const EdgeInsets.all(8.0),
                       child: BlockEditorWidget(
                         block: block,
                         medicationProvider: medicationProvider,
                         onChanged: (updated) => _updateBlock(index, updated),
                         onDelete: () => _deleteBlock(index),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-              
-            // 5. Marge de fin pour éviter que le FAB ou le bas de l'écran ne cache le dernier élément
-            const SliverToBoxAdapter(child: SizedBox(height: 80)),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -531,14 +536,19 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
         context: context, builder: (_) => const BlockTypeSelectorDialog());
     if (type == null) return;
 
+    // L'ID est généré automatiquement par le constructeur de ProtocolBlock
+    var newBlock = createBlockOfType(type, _protocol.blocs.length);
+
     setState(() {
       _protocol = _protocol.copyWith(
-          blocs: [..._protocol.blocs, createBlockOfType(type, _protocol.blocs.length)]);
+          blocs: [..._protocol.blocs, newBlock]);
       _hasChanges = true;
     });
   }
 
   void _updateBlock(int index, ProtocolBlock updated) {
+    if (_protocol.blocs[index] == updated) return;
+
     final newBlocs = List<ProtocolBlock>.from(_protocol.blocs);
     newBlocs[index] = updated;
     setState(() {

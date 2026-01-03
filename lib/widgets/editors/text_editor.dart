@@ -5,8 +5,11 @@ class TexteBlockEditor extends StatefulWidget {
   final TexteBlock block;
   final Function(ProtocolBlock) onChanged;
 
-  const TexteBlockEditor(
-      {super.key, required this.block, required this.onChanged});
+  const TexteBlockEditor({
+    super.key, 
+    required this.block, 
+    required this.onChanged
+  });
 
   @override
   State<TexteBlockEditor> createState() => _TexteBlockEditorState();
@@ -24,14 +27,31 @@ class _TexteBlockEditorState extends State<TexteBlockEditor> {
   }
 
   @override
+  void didUpdateWidget(TexteBlockEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.block.contenu != oldWidget.block.contenu &&
+        widget.block.contenu != _contenuController.text) {
+      _contenuController.text = widget.block.contenu;
+      // Garder le curseur à la fin si possible
+      _contenuController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _contenuController.text.length));
+    }
+    if (widget.block.format != oldWidget.block.format) {
+      _format = widget.block.format ?? TexteFormat();
+    }
+  }
+
+  @override
   void dispose() {
     _contenuController.dispose();
     super.dispose();
   }
 
   void _updateBlock() {
-    widget.onChanged(widget.block
-        .copyWith(contenu: _contenuController.text, format: _format));
+    widget.onChanged(widget.block.copyWith(
+      contenu: _contenuController.text, 
+      format: _format
+    ));
   }
 
   @override
@@ -48,8 +68,7 @@ class _TexteBlockEditorState extends State<TexteBlockEditor> {
                 isActive: _format.gras,
                 activeColor: colorScheme.primary,
                 onToggle: () {
-                  setState(
-                      () => _format = _format.copyWith(gras: !_format.gras));
+                  setState(() => _format = _format.copyWith(gras: !_format.gras));
                   _updateBlock();
                 }),
             _FormatToggle(
@@ -57,8 +76,7 @@ class _TexteBlockEditorState extends State<TexteBlockEditor> {
                 isActive: _format.italique,
                 activeColor: colorScheme.primary,
                 onToggle: () {
-                  setState(() =>
-                      _format = _format.copyWith(italique: !_format.italique));
+                  setState(() => _format = _format.copyWith(italique: !_format.italique));
                   _updateBlock();
                 }),
             _FormatToggle(
@@ -66,8 +84,7 @@ class _TexteBlockEditorState extends State<TexteBlockEditor> {
                 isActive: _format.souligne,
                 activeColor: colorScheme.primary,
                 onToggle: () {
-                  setState(() =>
-                      _format = _format.copyWith(souligne: !_format.souligne));
+                  setState(() => _format = _format.copyWith(souligne: !_format.souligne));
                   _updateBlock();
                 }),
           ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import '../../models/protocol_model.dart';
 import '../../services/medication_provider.dart';
 import '../block_editor_widget.dart';
@@ -33,6 +34,17 @@ class _SectionBlockEditorState extends State<SectionBlockEditor> {
   }
 
   @override
+  void didUpdateWidget(SectionBlockEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.block.titre != _titreController.text) {
+      _titreController.text = widget.block.titre;
+    }
+    if ((widget.block.temps ?? '') != _tempsController.text) {
+      _tempsController.text = widget.block.temps ?? '';
+    }
+  }
+
+  @override
   void dispose() {
     _titreController.dispose();
     _tempsController.dispose();
@@ -50,7 +62,10 @@ class _SectionBlockEditorState extends State<SectionBlockEditor> {
     final type = await showDialog<BlockType>(
         context: context, builder: (_) => const BlockTypeSelectorDialog());
     if (type == null) return;
-    final newBlock = createBlockOfType(type, widget.block.contenu.length);
+    
+    var newBlock = createBlockOfType(type, widget.block.contenu.length)
+        .copyWith(id: const Uuid().v4());
+        
     final updatedContenu = [...widget.block.contenu, newBlock];
     widget.onChanged(widget.block.copyWith(contenu: updatedContenu));
   }
@@ -133,29 +148,30 @@ class _SectionBlockEditorState extends State<SectionBlockEditor> {
         ),
         const SizedBox(height: 8),
         
-        // Liste interne : On garde shrinkWrap ici car nous sommes à l'intérieur 
-        // d'un élément qui est déjà géré par un Sliver parent.
-        // L'impact performance est négligeable car le parent ne rend ce widget
-        // que s'il est visible.
         if (widget.block.contenu.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Center(child: Text("Vide", style: TextStyle(color: Colors.grey))),
+          Container(
+            padding: const EdgeInsets.all(16),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              // CORRECTION ICI : dashed -> solid
+              border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text("Section vide", style: TextStyle(color: Colors.grey)),
           )
         else
           ReorderableListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            // buildDefaultDragHandles est important pour éviter les conflits
-            // de drag avec la liste parente si nécessaire
             buildDefaultDragHandles: true, 
             itemCount: widget.block.contenu.length,
             onReorder: _reorderSubBlocks,
             itemBuilder: (context, index) {
               final subBlock = widget.block.contenu[index];
+              final key = ValueKey(subBlock.id); // ID stable
+              
               return Container(
-                 // Clé unique indispensable pour le ReorderableListView
-                key: ValueKey('${subBlock.type}_${subBlock.hashCode}'),
+                key: key,
                 margin: const EdgeInsets.only(bottom: 8),
                 child: BlockEditorWidget(
                   block: subBlock,

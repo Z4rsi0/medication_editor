@@ -20,11 +20,30 @@ class _TableauBlockEditorState extends State<TableauBlockEditor> {
   @override
   void initState() {
     super.initState();
+    _initData();
+  }
+
+  void _initData() {
     _titreController = TextEditingController(text: widget.block.titre ?? '');
     _colonnes = List.from(widget.block.colonnes);
     _lignes = widget.block.lignes.map((l) => List<String>.from(l)).toList();
     if (_colonnes.isEmpty) _colonnes = ['Colonne 1'];
     if (_lignes.isEmpty) _lignes = [['']];
+  }
+
+  @override
+  void didUpdateWidget(TableauBlockEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sync titre
+    if (widget.block.titre != _titreController.text) {
+      _titreController.text = widget.block.titre ?? '';
+    }
+    // Sync structure si changée drastiquement (ex: undo/redo)
+    if (widget.block.colonnes.length != _colonnes.length || 
+        widget.block.lignes.length != _lignes.length) {
+       _colonnes = List.from(widget.block.colonnes);
+       _lignes = widget.block.lignes.map((l) => List<String>.from(l)).toList();
+    }
   }
 
   @override
@@ -101,7 +120,10 @@ class _TableauBlockEditorState extends State<TableauBlockEditor> {
           children: List.generate(_colonnes.length, (i) {
             return SizedBox(
               width: 150,
-              child: TextField(
+              child: TextFormField(
+                // Clé unique pour éviter la perte de focus si on supprime une colonne avant
+                key: ValueKey('col_$i'),
+                initialValue: _colonnes[i],
                 decoration: InputDecoration(
                   labelText: 'Col ${i + 1}',
                   border: const OutlineInputBorder(),
@@ -111,7 +133,6 @@ class _TableauBlockEditorState extends State<TableauBlockEditor> {
                           onPressed: () => _removeColumn(i))
                       : null,
                 ),
-                controller: TextEditingController(text: _colonnes[i]),
                 onChanged: (v) {
                   _colonnes[i] = v;
                   _updateBlock();
@@ -146,15 +167,13 @@ class _TableauBlockEditorState extends State<TableauBlockEditor> {
                     children: List.generate(_colonnes.length, (colIndex) {
                       return SizedBox(
                         width: 150,
-                        child: TextField(
+                        child: TextFormField(
+                          key: ValueKey('cell_${rowIndex}_$colIndex'),
+                          initialValue: colIndex < row.length ? row[colIndex] : '',
                           decoration: InputDecoration(
-                              hintText: _colonnes[colIndex],
+                              hintText: colIndex < _colonnes.length ? _colonnes[colIndex] : '',
                               border: const OutlineInputBorder(),
                               isDense: true),
-                          controller: TextEditingController(
-                              text: colIndex < row.length
-                                  ? row[colIndex]
-                                  : ''),
                           onChanged: (v) {
                             while (row.length <= colIndex) {
                               row.add('');

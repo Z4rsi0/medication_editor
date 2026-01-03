@@ -25,13 +25,32 @@ class _ImageBlockEditorState extends State<ImageBlockEditor> {
   @override
   void initState() {
     super.initState();
-    _legendeController =
-        TextEditingController(text: widget.block.legende ?? '');
+    _initValues();
+  }
+
+  void _initValues() {
+    _legendeController = TextEditingController(text: widget.block.legende ?? '');
     _urlController = TextEditingController(
         text: widget.block.estBase64 ? '' : widget.block.source);
     _largeur = widget.block.largeurPourcent ?? 100;
     _isBase64 = widget.block.estBase64;
     if (_isBase64) _base64Data = widget.block.source;
+  }
+
+  @override
+  void didUpdateWidget(ImageBlockEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.block != oldWidget.block) {
+      if ((widget.block.legende ?? '') != _legendeController.text) {
+        _legendeController.text = widget.block.legende ?? '';
+      }
+      if (!widget.block.estBase64 && widget.block.source != _urlController.text) {
+        _urlController.text = widget.block.source;
+      }
+      if (widget.block.largeurPourcent != _largeur) {
+        _largeur = widget.block.largeurPourcent ?? 100;
+      }
+    }
   }
 
   @override
@@ -79,7 +98,12 @@ class _ImageBlockEditorState extends State<ImageBlockEditor> {
                 icon: Icon(Icons.file_upload)),
           ],
           selected: {_isBase64},
-          onSelectionChanged: (set) => setState(() => _isBase64 = set.first),
+          onSelectionChanged: (set) {
+            setState(() {
+              _isBase64 = set.first;
+              _updateBlock();
+            });
+          },
         ),
         const SizedBox(height: 12),
         if (_isBase64) ...[

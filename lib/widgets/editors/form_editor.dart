@@ -22,10 +22,22 @@ class _FormulaireBlockEditorState extends State<FormulaireBlockEditor> {
   void initState() {
     super.initState();
     _titreController = TextEditingController(text: widget.block.titre);
-    _descriptionController =
-        TextEditingController(text: widget.block.description ?? '');
+    _descriptionController = TextEditingController(text: widget.block.description ?? '');
     _champs = List.from(widget.block.champs);
     _interpretations = List.from(widget.block.interpretations ?? []);
+  }
+
+  @override
+  void didUpdateWidget(FormulaireBlockEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.block.titre != _titreController.text) {
+      _titreController.text = widget.block.titre;
+    }
+    if ((widget.block.description ?? '') != _descriptionController.text) {
+      _descriptionController.text = widget.block.description ?? '';
+    }
+    // Pour les listes complexes (champs/interpretations), on suppose que le state local est maître 
+    // tant qu'on édite, sauf si changement structurel majeur.
   }
 
   @override
@@ -94,6 +106,7 @@ class _FormulaireBlockEditorState extends State<FormulaireBlockEditor> {
           ],
         ),
         ..._champs.asMap().entries.map((entry) => _ChampEditor(
+              key: ValueKey(entry.value.id), // Clé stable si possible
               champ: entry.value,
               onChanged: (c) {
                 _champs[entry.key] = c;
@@ -120,6 +133,7 @@ class _FormulaireBlockEditorState extends State<FormulaireBlockEditor> {
             .asMap()
             .entries
             .map((entry) => _InterpretationEditor(
+                  key: ValueKey('interp_${entry.key}'),
                   interpretation: entry.value,
                   onChanged: (i) {
                     _interpretations[entry.key] = i;
@@ -141,7 +155,7 @@ class _ChampEditor extends StatelessWidget {
   final VoidCallback onDelete;
 
   const _ChampEditor(
-      {required this.champ, required this.onChanged, required this.onDelete});
+      {super.key, required this.champ, required this.onChanged, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -156,24 +170,24 @@ class _ChampEditor extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
+                  child: TextFormField(
+                    initialValue: champ.id,
                     decoration: const InputDecoration(
                         labelText: 'ID',
                         border: OutlineInputBorder(),
                         isDense: true),
-                    controller: TextEditingController(text: champ.id),
                     onChanged: (v) => onChanged(champ.copyWith(id: v)),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   flex: 2,
-                  child: TextField(
+                  child: TextFormField(
+                    initialValue: champ.label,
                     decoration: const InputDecoration(
                         labelText: 'Label',
                         border: OutlineInputBorder(),
                         isDense: true),
-                    controller: TextEditingController(text: champ.label),
                     onChanged: (v) => onChanged(champ.copyWith(label: v)),
                   ),
                 ),
@@ -203,28 +217,26 @@ class _ChampEditor extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: TextFormField(
+                      initialValue: champ.min?.toString() ?? '',
                       decoration: const InputDecoration(
                           labelText: 'Min',
                           border: OutlineInputBorder(),
                           isDense: true),
                       keyboardType: TextInputType.number,
-                      controller:
-                          TextEditingController(text: champ.min?.toString() ?? ''),
                       onChanged: (v) =>
                           onChanged(champ.copyWith(min: num.tryParse(v))),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: TextField(
+                    child: TextFormField(
+                      initialValue: champ.max?.toString() ?? '',
                       decoration: const InputDecoration(
                           labelText: 'Max',
                           border: OutlineInputBorder(),
                           isDense: true),
                       keyboardType: TextInputType.number,
-                      controller:
-                          TextEditingController(text: champ.max?.toString() ?? ''),
                       onChanged: (v) =>
                           onChanged(champ.copyWith(max: num.tryParse(v))),
                     ),
@@ -234,14 +246,13 @@ class _ChampEditor extends StatelessWidget {
             ],
             if (champ.type == ChampType.checkbox) ...[
               const SizedBox(height: 8),
-              TextField(
+              TextFormField(
+                initialValue: champ.points?.toString() ?? '',
                 decoration: const InputDecoration(
                     labelText: 'Points si coché',
                     border: OutlineInputBorder(),
                     isDense: true),
                 keyboardType: TextInputType.number,
-                controller: TextEditingController(
-                    text: champ.points?.toString() ?? ''),
                 onChanged: (v) =>
                     onChanged(champ.copyWith(points: int.tryParse(v))),
               ),
@@ -272,7 +283,7 @@ class _InterpretationEditor extends StatelessWidget {
   final VoidCallback onDelete;
 
   const _InterpretationEditor(
-      {required this.interpretation,
+      {super.key, required this.interpretation,
       required this.onChanged,
       required this.onDelete});
 
@@ -289,28 +300,26 @@ class _InterpretationEditor extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
+                  child: TextFormField(
+                    initialValue: interpretation.min.toString(),
                     decoration: const InputDecoration(
                         labelText: 'Min',
                         border: OutlineInputBorder(),
                         isDense: true),
                     keyboardType: TextInputType.number,
-                    controller: TextEditingController(
-                        text: interpretation.min.toString()),
                     onChanged: (v) => onChanged(
                         interpretation.copyWith(min: num.tryParse(v) ?? 0)),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
+                  child: TextFormField(
+                    initialValue: interpretation.max.toString(),
                     decoration: const InputDecoration(
                         labelText: 'Max',
                         border: OutlineInputBorder(),
                         isDense: true),
                     keyboardType: TextInputType.number,
-                    controller: TextEditingController(
-                        text: interpretation.max.toString()),
                     onChanged: (v) => onChanged(
                         interpretation.copyWith(max: num.tryParse(v) ?? 100)),
                   ),
@@ -322,12 +331,12 @@ class _InterpretationEditor extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            TextField(
+            TextFormField(
+              initialValue: interpretation.texte,
               decoration: const InputDecoration(
                   labelText: 'Texte d\'interprétation',
                   border: OutlineInputBorder(),
                   isDense: true),
-              controller: TextEditingController(text: interpretation.texte),
               onChanged: (v) => onChanged(interpretation.copyWith(texte: v)),
             ),
             const SizedBox(height: 8),
@@ -366,27 +375,19 @@ class _InterpretationEditor extends StatelessWidget {
 
   String _getNiveauLabel(InterpretationNiveau niveau) {
     switch (niveau) {
-      case InterpretationNiveau.faible:
-        return 'Faible';
-      case InterpretationNiveau.modere:
-        return 'Modéré';
-      case InterpretationNiveau.eleve:
-        return 'Élevé';
-      case InterpretationNiveau.critique:
-        return 'Critique';
+      case InterpretationNiveau.faible: return 'Faible';
+      case InterpretationNiveau.modere: return 'Modéré';
+      case InterpretationNiveau.eleve: return 'Élevé';
+      case InterpretationNiveau.critique: return 'Critique';
     }
   }
 
   Color _getNiveauColor(InterpretationNiveau niveau) {
     switch (niveau) {
-      case InterpretationNiveau.faible:
-        return Colors.green;
-      case InterpretationNiveau.modere:
-        return Colors.orange;
-      case InterpretationNiveau.eleve:
-        return Colors.deepOrange;
-      case InterpretationNiveau.critique:
-        return Colors.red;
+      case InterpretationNiveau.faible: return Colors.green;
+      case InterpretationNiveau.modere: return Colors.orange;
+      case InterpretationNiveau.eleve: return Colors.deepOrange;
+      case InterpretationNiveau.critique: return Colors.red;
     }
   }
 }
