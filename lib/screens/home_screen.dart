@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/medication_provider.dart';
 import '../services/protocol_provider.dart';
-// Imports des écrans
 import 'medication_list_screen.dart';
 import 'general_info_screen.dart'; 
-// NOUVEAU : Ce fichier contient maintenant la classe ProtocolListScreen ET ProtocolEditorScreen
 import 'protocol_editor_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -34,13 +32,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // 1. Charger les médicaments
       if (mounted) {
         await Provider.of<MedicationProvider>(context, listen: false).loadFromGitHub();
       }
       
-      // 2. Charger les protocoles
       if (mounted) {
+        // Charge TOUS les protocoles (Standards + Pocus)
         await Provider.of<ProtocolProvider>(context, listen: false).loadAllProtocolsFromGitHub();
       }
       
@@ -95,31 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.medical_services,
-                size: 80,
-                color: Colors.teal.shade300,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Éditeur Médical',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Gestion des médicaments et protocoles',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-
-              // Section Médicaments (Inchangée)
+              // --- 1. MÉDICAMENTS ---
               Card(
                 elevation: 4,
                 child: Padding(
@@ -128,27 +101,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.medication,
-                            size: 40,
-                            color: Colors.teal.shade400,
-                          ),
+                          Icon(Icons.medication, size: 40, color: Colors.teal.shade400),
                           const SizedBox(width: 16),
                           const Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Médicaments',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  'Créer et gérer les fiches médicaments',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
+                                Text('Médicaments', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                                Text('Doses et posologies pédiatriques', style: TextStyle(color: Colors.grey)),
                               ],
                             ),
                           ),
@@ -157,13 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 16),
                       Consumer<MedicationProvider>(
                         builder: (context, provider, child) {
-                          return Text(
-                            '${provider.medications.length} médicament(s) chargé(s)',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
-                          );
+                          return Text('${provider.medications.length} médicament(s)', style: const TextStyle(color: Colors.grey));
                         },
                       ),
                       const SizedBox(height: 16),
@@ -172,42 +126,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () {
-                                Provider.of<MedicationProvider>(context, listen: false)
-                                    .startNewMedication();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const GeneralInfoScreen(),
-                                  ),
-                                );
+                                Provider.of<MedicationProvider>(context, listen: false).startNewMedication();
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const GeneralInfoScreen()));
                               },
                               icon: const Icon(Icons.add),
                               label: const Text('Nouveau'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const MedicationListScreen(),
-                                  ),
-                                );
-                              },
+                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MedicationListScreen())),
                               icon: const Icon(Icons.list),
                               label: const Text('Liste'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.teal,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                side: const BorderSide(color: Colors.teal, width: 2),
-                              ),
+                              style: OutlinedButton.styleFrom(foregroundColor: Colors.teal, side: const BorderSide(color: Colors.teal)),
                             ),
                           ),
                         ],
@@ -218,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Section Protocoles (Nouveau système)
+              // --- 2. PROTOCOLES (STANDARDS) ---
               Card(
                 elevation: 4,
                 child: Padding(
@@ -227,27 +160,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.description,
-                            size: 40,
-                            color: Colors.blue.shade400,
-                          ),
+                          const Icon(Icons.description, size: 40, color: Colors.blue),
                           const SizedBox(width: 16),
                           const Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Protocoles',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  'Nouveau système par blocs',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
+                                Text('Protocoles', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                                Text('Soins et procédures standards', style: TextStyle(color: Colors.grey)),
                               ],
                             ),
                           ),
@@ -256,13 +176,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 16),
                       Consumer<ProtocolProvider>(
                         builder: (context, provider, child) {
-                          return Text(
-                            '${provider.protocols.length} protocole(s) chargé(s)',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
-                          );
+                          // Compteur filtré
+                          return Text('${provider.standardProtocols.length} protocole(s)', style: const TextStyle(color: Colors.grey));
                         },
                       ),
                       const SizedBox(height: 16),
@@ -271,45 +186,94 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () {
-                                // CORRECTION : Utilisation de createNewProtocol
                                 final provider = Provider.of<ProtocolProvider>(context, listen: false);
                                 final newProtocol = provider.createNewProtocol();
-                                
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ProtocolEditorScreen(protocol: newProtocol),
-                                  ),
-                                );
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => ProtocolEditorScreen(protocol: newProtocol)));
                               },
                               icon: const Icon(Icons.add),
                               label: const Text('Nouveau'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () {
-                                // CORRECTION : Pointe vers ProtocolListScreen qui est dans protocol_editor_screen.dart
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const ProtocolListScreen(),
-                                  ),
-                                );
-                              },
+                              onPressed: () => Navigator.push(
+                                context, 
+                                // Mode Standard
+                                MaterialPageRoute(builder: (_) => const ProtocolListScreen(isPocusMode: false))
+                              ),
                               icon: const Icon(Icons.list),
                               label: const Text('Liste'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.blue,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                side: const BorderSide(color: Colors.blue, width: 2),
+                              style: OutlinedButton.styleFrom(foregroundColor: Colors.blue, side: const BorderSide(color: Colors.blue)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // --- 3. POCUS (NOUVEAU) ---
+              Card(
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.waves, size: 40, color: Colors.teal), // Icône Pocus
+                          const SizedBox(width: 16),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('POCUS', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                                Text('Échographie clinique', style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Consumer<ProtocolProvider>(
+                        builder: (context, provider, child) {
+                          // Compteur filtré
+                          return Text('${provider.pocusProtocols.length} fiche(s) écho', style: const TextStyle(color: Colors.grey));
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                final provider = Provider.of<ProtocolProvider>(context, listen: false);
+                                // Création avec pré-remplissage POCUS
+                                var newProtocol = provider.createNewProtocol();
+                                newProtocol = newProtocol.copyWith(categorie: 'POCUS');
+                                
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => ProtocolEditorScreen(protocol: newProtocol)));
+                              },
+                              icon: const Icon(Icons.add),
+                              label: const Text('Nouveau'),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => Navigator.push(
+                                context, 
+                                // Mode Pocus
+                                MaterialPageRoute(builder: (_) => const ProtocolListScreen(isPocusMode: true))
                               ),
+                              icon: const Icon(Icons.list),
+                              label: const Text('Liste'),
+                              style: OutlinedButton.styleFrom(foregroundColor: Colors.teal, side: const BorderSide(color: Colors.teal)),
                             ),
                           ),
                         ],

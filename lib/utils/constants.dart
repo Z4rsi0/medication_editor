@@ -1,4 +1,27 @@
 class MedicationConstants {
+  // --- NOUVEAU : LISTE DES CATÉGORIES ---
+  static const List<String> categories = [
+    'POCUS', // Important pour le tri automatique
+    'Anesthésie',
+    'Cardiologie',
+    'Chirurgie',
+    'Dermatologie',
+    'Endocrinologie',
+    'Gastro-entérologie',
+    'Hématologie',
+    'Infectiologie',
+    'Néonatologie',
+    'Néphrologie',
+    'Neurologie',
+    'ORL',
+    'Pneumologie',
+    'Psychiatrie',
+    'Rhumatologie',
+    'Urgences',
+    'Urologie',
+    'Autre',
+  ];
+
   // Formes galéniques courantes
   static const List<String> galeniques = [
     'Comprimé',

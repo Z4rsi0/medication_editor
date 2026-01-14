@@ -6,12 +6,18 @@ import '../services/medication_provider.dart';
 import '../widgets/block_editor_widget.dart';
 import '../widgets/editors/block_factory.dart';
 import '../widgets/editors/block_type_selector.dart';
+import '../utils/constants.dart'; // Import des constantes pour les catégories
 
 // ============================================================================
-// ÉCRAN 1 : LISTE DES PROTOCOLES (Inchangé)
+// ÉCRAN 1 : LISTE DES PROTOCOLES (Filtrée)
 // ============================================================================
 class ProtocolListScreen extends StatefulWidget {
-  const ProtocolListScreen({super.key});
+  final bool isPocusMode; // Filtre activé ou non
+
+  const ProtocolListScreen({
+    super.key, 
+    this.isPocusMode = false, // Par défaut Standard
+  });
 
   @override
   State<ProtocolListScreen> createState() => _ProtocolListScreenState();
@@ -34,19 +40,28 @@ class _ProtocolListScreenState extends State<ProtocolListScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<ProtocolProvider>(context);
-    final allProtocols = provider.protocols;
+    
+    // FILTRAGE SELON LE MODE
+    final sourceList = widget.isPocusMode 
+        ? provider.pocusProtocols 
+        : provider.standardProtocols;
 
     final protocols = _searchQuery.isEmpty
-        ? allProtocols
-        : allProtocols
+        ? sourceList
+        : sourceList
             .where((p) =>
                 p.titre.toLowerCase().contains(_searchQuery.toLowerCase()))
             .toList();
 
+    // Thème dynamique selon le mode
+    final themeColor = widget.isPocusMode ? Colors.teal : Colors.blue;
+    final title = widget.isPocusMode ? 'Fiches POCUS' : 'Protocoles de soins';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Protocoles (GitHub)'),
-        backgroundColor: Colors.teal,
+        title: Text(title),
+        backgroundColor: themeColor,
+        foregroundColor: Colors.white,
         actions: [
           if (provider.isLoading)
             const Padding(
@@ -67,32 +82,37 @@ class _ProtocolListScreenState extends State<ProtocolListScreen> {
       ),
       body: Column(
         children: [
+          // Barre de recherche
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Rechercher un protocole...',
+                hintText: 'Rechercher...',
                 prefixIcon: const Icon(Icons.search),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
               ),
               onChanged: (value) => setState(() => _searchQuery = value),
             ),
           ),
+          
+          // Liste
           Expanded(
             child: protocols.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.description_outlined,
-                            size: 64, color: Colors.grey.shade400),
+                        Icon(
+                          widget.isPocusMode ? Icons.waves : Icons.description_outlined,
+                          size: 64, 
+                          color: Colors.grey.shade400
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           provider.isLoading
                               ? 'Chargement...'
-                              : 'Aucun protocole trouvé',
+                              : 'Aucun élément trouvé',
                           style: TextStyle(
                               fontSize: 18, color: Colors.grey.shade600),
                         ),
@@ -106,18 +126,17 @@ class _ProtocolListScreenState extends State<ProtocolListScreen> {
                       final protocol = protocols[index];
                       return _ProtocolCard(
                         protocol: protocol,
+                        themeColor: themeColor,
                         onTap: () => _openEditor(context, protocol),
                         onDuplicate: () async {
                           final newProto = provider.duplicateProtocol(protocol);
                           await provider.saveProtocol(newProto);
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Protocole dupliqué !')));
+                                const SnackBar(content: Text('Dupliqué !')));
                           }
                         },
-                        onDelete: () =>
-                            _confirmDelete(context, provider, protocol),
+                        onDelete: () => _confirmDelete(context, provider, protocol),
                       );
                     },
                   ),
@@ -126,10 +145,15 @@ class _ProtocolListScreenState extends State<ProtocolListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          final newProto = provider.createNewProtocol();
+          var newProto = provider.createNewProtocol();
+          // Si on est en mode Pocus, on pré-remplit la catégorie
+          if (widget.isPocusMode) {
+            newProto = newProto.copyWith(categorie: 'POCUS');
+          }
           _openEditor(context, newProto);
         },
-        backgroundColor: Colors.teal,
+        backgroundColor: themeColor,
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Nouveau'),
       ),
@@ -170,7 +194,7 @@ class _ProtocolListScreenState extends State<ProtocolListScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(success
-                ? 'Protocole supprimé'
+                ? 'Supprimé avec succès'
                 : 'Erreur lors de la suppression'),
             backgroundColor: success ? Colors.green : Colors.red,
           ),
@@ -182,12 +206,14 @@ class _ProtocolListScreenState extends State<ProtocolListScreen> {
 
 class _ProtocolCard extends StatelessWidget {
   final Protocol protocol;
+  final Color themeColor;
   final VoidCallback onTap;
   final VoidCallback onDuplicate;
   final VoidCallback onDelete;
 
   const _ProtocolCard({
     required this.protocol,
+    required this.themeColor,
     required this.onTap,
     required this.onDuplicate,
     required this.onDelete,
@@ -207,10 +233,13 @@ class _ProtocolCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.teal.shade50,
+                  color: themeColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.description, color: Colors.teal.shade700),
+                child: Icon(
+                  protocol.categorie == 'POCUS' ? Icons.waves : Icons.description, 
+                  color: themeColor
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -222,15 +251,33 @@ class _ProtocolCard extends StatelessWidget {
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                    if (protocol.description != null &&
-                        protocol.description!.isNotEmpty)
-                      Text(
-                        protocol.description!,
-                        style: TextStyle(
-                            color: Colors.grey.shade600, fontSize: 14),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    const SizedBox(height: 4),
+                    // Affichage de la catégorie et description
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        if (protocol.categorie != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              protocol.categorie!,
+                              style: TextStyle(fontSize: 10, color: Colors.grey.shade800),
+                            ),
+                          ),
+                        if (protocol.description != null && protocol.description!.isNotEmpty)
+                          Text(
+                            protocol.description!,
+                            style: TextStyle(
+                                color: Colors.grey.shade600, fontSize: 14),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -265,7 +312,7 @@ class _ProtocolCard extends StatelessWidget {
 }
 
 // ============================================================================
-// ÉCRAN 2 : ÉDITEUR DE PROTOCOLE - ARCHITECTURE CORRIGÉE
+// ÉCRAN 2 : ÉDITEUR DE PROTOCOLE (Avec Catégorie)
 // ============================================================================
 
 class ProtocolEditorScreen extends StatefulWidget {
@@ -281,11 +328,11 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
   late Protocol _protocol;
   bool _hasChanges = false;
 
-  // Controllers pour les métadonnées
   late TextEditingController _titreController;
   late TextEditingController _descriptionController;
   late TextEditingController _auteurController;
   late TextEditingController _versionController;
+  // Pas de controller pour Dropdown, on utilise _protocol.categorie directement
 
   @override
   void initState() {
@@ -309,13 +356,14 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
     super.dispose();
   }
 
-  void _updateMeta() {
+  void _updateMeta({String? categorie}) {
     setState(() {
       _protocol = _protocol.copyWith(
         titre: _titreController.text,
         description: _descriptionController.text,
         auteur: _auteurController.text,
         version: _versionController.text,
+        categorie: categorie ?? _protocol.categorie, // Mise à jour catégorie
       );
       _hasChanges = true;
     });
@@ -350,6 +398,9 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final medicationProvider = Provider.of<MedicationProvider>(context);
+    // On définit la couleur de l'appbar selon la catégorie
+    final isPocus = _protocol.categorie == 'POCUS';
+    final themeColor = isPocus ? Colors.teal : Colors.blue;
 
     // ignore: deprecated_member_use
     return WillPopScope(
@@ -383,6 +434,8 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
       child: Scaffold(
         backgroundColor: Colors.grey.shade100,
         appBar: AppBar(
+          backgroundColor: themeColor,
+          foregroundColor: Colors.white,
           title: Text(_protocol.fileName == null ? 'Nouveau' : 'Modifier'),
           actions: [
             Consumer<ProtocolProvider>(
@@ -406,10 +459,8 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
             ),
           ],
         ),
-        // Remplacement de CustomScrollView par ReorderableListView
-        // pour une meilleure stabilité et gestion du drag
         body: ReorderableListView.builder(
-          buildDefaultDragHandles: false, // On utilise nos propres poignées
+          buildDefaultDragHandles: false,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
           header: Card(
             margin: const EdgeInsets.only(bottom: 16),
@@ -421,11 +472,32 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
                   const Text('Infos Générales',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
+                  
+                  // CHAMP TITRE
                   TextField(
                       controller: _titreController,
                       decoration: const InputDecoration(labelText: 'Titre *'),
                       onChanged: (_) => _updateMeta()),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  
+                  // CHAMP CATÉGORIE (Nouveau Dropdown)
+                  DropdownButtonFormField<String>(
+                    value: _protocol.categorie,
+                    decoration: const InputDecoration(
+                      labelText: 'Catégorie',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.category)
+                    ),
+                    items: MedicationConstants.categories.map((cat) {
+                      return DropdownMenuItem(
+                        value: cat,
+                        child: Text(cat),
+                      );
+                    }).toList(),
+                    onChanged: (val) => _updateMeta(categorie: val),
+                  ),
+                  const SizedBox(height: 12),
+
                   TextField(
                       controller: _descriptionController,
                       decoration:
@@ -433,6 +505,7 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
                       maxLines: 2,
                       onChanged: (_) => _updateMeta()),
                   const SizedBox(height: 8),
+                  
                   Row(children: [
                     Expanded(
                         child: TextField(
@@ -449,6 +522,8 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
                             onChanged: (_) => _updateMeta())),
                   ]),
                   const SizedBox(height: 16),
+                  
+                  // Header section contenu
                   Row(
                     children: [
                       const Text('Contenu du protocole',
@@ -459,6 +534,7 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
                         onPressed: _addBlock,
                         icon: const Icon(Icons.add),
                         label: const Text('Ajouter'),
+                        style: FilledButton.styleFrom(backgroundColor: themeColor),
                       ),
                     ],
                   ),
@@ -470,9 +546,6 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
           onReorder: _reorderBlocks,
           itemBuilder: (context, index) {
             final block = _protocol.blocs[index];
-            
-            // KEY STABLE BASÉE SUR L'UUID
-            // C'est ici que le problème du clavier est résolu au niveau liste
             return Container(
               key: ValueKey(block.id),
               margin: const EdgeInsets.only(bottom: 8),
@@ -490,7 +563,6 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // POIGNÉE DE DRAG EXPLICITE
                   ReorderableDragStartListener(
                     index: index,
                     child: Container(
@@ -502,13 +574,11 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
                           bottomLeft: Radius.circular(12),
                         ),
                       ),
-                      height: 100, // Hauteur arbitraire pour la zone de drag
+                      height: 100,
                       alignment: Alignment.center,
                       child: const Icon(Icons.drag_indicator, color: Colors.grey),
                     ),
                   ),
-                  
-                  // CONTENU EDITABLE
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
@@ -529,16 +599,13 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
     );
   }
 
-  // --- LOGIQUE D'EDITION DES BLOCS ---
+  // --- LOGIQUE D'EDITION DES BLOCS (Inchangée) ---
 
   Future<void> _addBlock() async {
     final type = await showDialog<BlockType>(
         context: context, builder: (_) => const BlockTypeSelectorDialog());
     if (type == null) return;
-
-    // L'ID est généré automatiquement par le constructeur de ProtocolBlock
     var newBlock = createBlockOfType(type, _protocol.blocs.length);
-
     setState(() {
       _protocol = _protocol.copyWith(
           blocs: [..._protocol.blocs, newBlock]);
@@ -548,7 +615,6 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
 
   void _updateBlock(int index, ProtocolBlock updated) {
     if (_protocol.blocs[index] == updated) return;
-
     final newBlocs = List<ProtocolBlock>.from(_protocol.blocs);
     newBlocs[index] = updated;
     setState(() {
@@ -559,7 +625,6 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
 
   void _deleteBlock(int index) {
     final newBlocs = List<ProtocolBlock>.from(_protocol.blocs)..removeAt(index);
-    // Réindexer
     for (int i = 0; i < newBlocs.length; i++) {
       newBlocs[i] = newBlocs[i].copyWithOrdre(i);
     }
@@ -574,7 +639,6 @@ class _ProtocolEditorScreenState extends State<ProtocolEditorScreen> {
     final newBlocs = List<ProtocolBlock>.from(_protocol.blocs);
     final item = newBlocs.removeAt(oldIndex);
     newBlocs.insert(newIndex, item);
-    // Réindexer
     for (int i = 0; i < newBlocs.length; i++) {
       newBlocs[i] = newBlocs[i].copyWithOrdre(i);
     }

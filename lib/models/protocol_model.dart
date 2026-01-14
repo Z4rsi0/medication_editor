@@ -44,6 +44,8 @@ class Protocol {
   final String? description;
   final String? auteur;
   final String? version;
+  // NOUVEAU : Champ catégorie
+  final String? categorie; 
   final DateTime? dateModification;
   final List<ProtocolBlock> blocs;
   final String? fileName;
@@ -53,6 +55,7 @@ class Protocol {
     this.description,
     this.auteur,
     this.version,
+    this.categorie, // Ajout constructeur
     this.dateModification,
     required this.blocs,
     this.fileName,
@@ -71,6 +74,7 @@ class Protocol {
       description: json['description'],
       auteur: json['auteur'],
       version: json['version'],
+      categorie: json['categorie'], // Mapping JSON
       dateModification: json['dateModification'] != null
           ? DateTime.tryParse(json['dateModification'])
           : null,
@@ -85,6 +89,7 @@ class Protocol {
       if (description != null) 'description': description,
       if (auteur != null) 'auteur': auteur,
       if (version != null) 'version': version,
+      if (categorie != null) 'categorie': categorie, // Sérialisation JSON
       'dateModification': DateTime.now().toIso8601String(),
       'blocs': blocs.map((b) => b.toJson()).toList(),
     };
@@ -117,6 +122,7 @@ class Protocol {
     String? description,
     String? auteur,
     String? version,
+    String? categorie, // Ajout copyWith
     DateTime? dateModification,
     List<ProtocolBlock>? blocs,
     String? fileName,
@@ -126,6 +132,7 @@ class Protocol {
       description: description ?? this.description,
       auteur: auteur ?? this.auteur,
       version: version ?? this.version,
+      categorie: categorie ?? this.categorie,
       dateModification: dateModification ?? this.dateModification,
       blocs: blocs ?? this.blocs,
       fileName: fileName ?? this.fileName,

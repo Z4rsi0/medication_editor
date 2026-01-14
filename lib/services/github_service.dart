@@ -171,7 +171,7 @@ class GitHubService {
     }
   }
 
-  // --- WRAPPERS SPECIFIQUES (Conserve la compatibilité) ---
+  // --- WRAPPERS AVEC SUPPORT DU DOSSIER CIBLE ---
 
   Future<String?> fetchMedications() => fetchFileContent(_filePath!);
 
@@ -180,12 +180,13 @@ class GitHubService {
     required String commitMessage,
   }) => publishFile(path: _filePath!, content: jsonContent, commitMessage: commitMessage);
 
-  Future<List<String>> listProtocols() async {
+  /// Liste les fichiers d'un dossier (par défaut assets/protocoles)
+  Future<List<String>> listProtocols({String folder = 'assets/protocoles'}) async {
     if (!isConfigured) return [];
     try {
-      const protocolsPath = 'assets/protocoles';
+      // On utilise le paramètre folder ici
       final response = await http.get(
-        Uri.parse('$_baseUrl/contents/$protocolsPath?ref=$_branch'),
+        Uri.parse('$_baseUrl/contents/$folder?ref=$_branch'),
         headers: _headers,
       ).timeout(const Duration(seconds: 10));
 
@@ -199,22 +200,27 @@ class GitHubService {
       }
       return [];
     } catch (e) {
-      print('Erreur listProtocols: $e');
+      print('Erreur listProtocols ($folder): $e');
       return [];
     }
   }
 
-  Future<String?> fetchProtocol(String fileName) => 
-      fetchFileContent('assets/protocoles/$fileName');
+  /// Récupère un protocole dans le dossier spécifié
+  Future<String?> fetchProtocol(String fileName, {String folder = 'assets/protocoles'}) => 
+      fetchFileContent('$folder/$fileName');
 
+  /// Publie (sauvegarde) un protocole dans le dossier spécifié
   Future<bool> publishProtocol({
     required String fileName,
     required String jsonContent,
     required String commitMessage,
-  }) => publishFile(path: 'assets/protocoles/$fileName', content: jsonContent, commitMessage: commitMessage);
+    String folder = 'assets/protocoles',
+  }) => publishFile(path: '$folder/$fileName', content: jsonContent, commitMessage: commitMessage);
 
+  /// Supprime un protocole dans le dossier spécifié
   Future<bool> deleteProtocol({
     required String fileName,
     required String commitMessage,
-  }) => deleteFile(path: 'assets/protocoles/$fileName', commitMessage: commitMessage);
+    String folder = 'assets/protocoles',
+  }) => deleteFile(path: '$folder/$fileName', commitMessage: commitMessage);
 }
